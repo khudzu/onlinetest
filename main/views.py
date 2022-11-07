@@ -105,27 +105,31 @@ def get_data(p):
 	return cm
 
 def data(request):
-    posts = PostModel.objects.all()
-    print(posts)
-    for post in posts:
-        post.Nama=get_data(post.Nama)
-        post.Alamat=get_data(post.Alamat)
-        post.NIK=get_data(post.NIK)
-    context = {
-		'page_title':'Data anda akan tersimpan dengan aman',
-		'posts':posts,
-	}
-
-    return render(request,'main/home.html',context)
-
-def home(request):
 	posts = PostModel.objects.all()
 
+	for post in posts:
+		post.image='/static/img/'+get_data(str(post.image))
+		post.Nama=get_data(post.Nama)
+		post.Alamat=get_data(post.Alamat)
+		post.NIK=get_data(post.NIK)
 	context = {
 		'page_title':'Data anda akan tersimpan dengan aman',
 		'posts':posts,
 	}
 
+	return render(request,'main/home.html',context)
+
+def home(request):
+	posts = PostModel.objects.all()
+	for post in posts:
+		post.image='/static/img/'+str(post.image)+'.png'
+		post.Nama=post.Nama
+		post.Alamat=post.Alamat
+		post.NIK=post.NIK
+	context = {
+		'page_title':'Data anda akan tersimpan dengan aman',
+		'posts':posts,
+	}
 	return render(request,'main/home.html',context)
 
 def create(request):
@@ -135,8 +139,8 @@ def create(request):
 		PostModel.objects.create(
 				Nama 		= get_secured_data(request.POST.get('nama')),
 				Password	= get_secured_data(request.POST.get('password')),
-				NIK			=get_secured_data(request.POST.get('nik')),
-				image 		= '/static/img/'+request.POST.get('image'),
+				NIK		= get_secured_data(request.POST.get('nik')),
+				image 		= get_secured_data(request.POST.get('image')),
 				Alamat		= get_secured_data(request.POST.get('alamat')),
 
 			)
