@@ -8,7 +8,6 @@ from django.contrib import messages
 from .forms import PostForm, LoginForm
 from .models import PostModel
 from sympy import *
-import cv2
 import numpy as np
 
 def get_secured_image(img, action, a, b, d):
@@ -130,9 +129,6 @@ def home(request):
 	return render(request,'main/home.html',context)
 
 def create(request):
-	img = cv2.imread('images/lena.png')
-	imc = get_secured_image(img, 'ENKRIPSI', 2, 3, 2)
-	cv2.imwrite('static/img/lena.png', imc)
 	post_form = PostForm()
 
 	if request.method == 'POST':
