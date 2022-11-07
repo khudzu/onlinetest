@@ -1,0 +1,15 @@
+
+{% load static %}
+
+{% block contents %}
+	<h1>{{page_title}}</h1>
+	<br>
+
+	<br>
+	{% for post in posts  %}
+		<img src="{{post.image}}" width="100px"><br>
+		Nama:<b>{{post.Nama}}</b>
+		<p>Alamat:{{post.Alamat}}</p>
+		<p>NIK:{{post.NIK}}</p>
+	{% endfor %}
+{% endblock contents %}

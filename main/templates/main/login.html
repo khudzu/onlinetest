@@ -1,0 +1,12 @@
+{% load static %}
+{% block contents %}
+	<h1>{{page_title}}</h1>
+
+	<form method = "POST">
+		{% csrf_token %}
+		<table>
+			{{login_form.as_table}}
+		</table>
+		<button type="Submit">Kirim</button>
+	</form>
+{% endblock contents %}
