@@ -172,12 +172,12 @@ def login(request):
 		print(user)
 		if user is not None:
 			login(request, user)
-			return redirect('/')
+			return redirect('/data')
 		else:
 			print(username_login)
 			print(password_login)
 			print('Username atau password anda salah, silahkan masukkan dengan benar!')
-			return redirect('/')
+			return redirect('/data')
 	return render(request, 'main/login.html', context)
 
 
