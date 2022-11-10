@@ -1,13 +1,14 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponseRedirect
 from django.contrib.auth import authenticate, login, logout
-from django.contrib import messages
+from main.functions.functions import handle_uploaded_file
 
 # Create your views here.
 
 from .forms import PostForm, LoginForm
 from .models import PostModel
 from sympy import *
+import cv2
 import numpy as np
 
 def get_secured_image(img, action, a, b, d):
@@ -136,11 +137,16 @@ def create(request):
 	post_form = PostForm()
 
 	if request.method == 'POST':
+		handle_uploaded_file(request.FILES['image'])
+		print('static/img/'+str(request.FILES['image']))
+		img = cv2.imread('static/img/'+str(request.FILES['image']))
+		imc = get_secured_image(img, 'ENKRIPSI', 2, 3, 2)
+		cv2.imwrite('static/img/' + get_secured_data(str(request.FILES['image'])) + '.png', imc)
 		PostModel.objects.create(
 				Nama 		= get_secured_data(request.POST.get('nama')),
 				Password	= get_secured_data(request.POST.get('password')),
-				NIK		= get_secured_data(request.POST.get('nik')),
-				image 		= get_secured_data(request.POST.get('image')),
+				NIK			=get_secured_data(request.POST.get('nik')),
+				image 		= get_secured_data(str(request.FILES['image'])),
 				Alamat		= get_secured_data(request.POST.get('alamat')),
 
 			)
