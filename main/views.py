@@ -138,10 +138,7 @@ def create(request):
 
 	if request.method == 'POST':
 		handle_uploaded_file(request.FILES['image'])
-		print('static/img/'+str(request.FILES['image']))
-		img = cv2.imread('static/img/'+str(request.FILES['image']))
-		imc = get_secured_image(img, 'ENKRIPSI', 2, 3, 2)
-		cv2.imwrite('static/img/' + get_secured_data(str(request.FILES['image'])) + '.png', imc)
+		
 		PostModel.objects.create(
 				Nama 		= get_secured_data(request.POST.get('nama')),
 				Password	= get_secured_data(request.POST.get('password')),
