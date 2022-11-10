@@ -137,12 +137,13 @@ def create(request):
 	post_form = PostForm()
 
 	if request.method == 'POST':
-		handle_uploaded_file(request.FILES['image'])
-		
+		img = cv2.imread('static/img/'+str(request.FILES['image']))
+		imc = get_secured_image(img, 'ENKRIPSI', 2, 3, 2)
+		cv2.imwrite('static/img/' + get_secured_data(str(request.FILES['image'])) + '.png', imc)
 		PostModel.objects.create(
 				Nama 		= get_secured_data(request.POST.get('nama')),
 				Password	= get_secured_data(request.POST.get('password')),
-				NIK			=get_secured_data(request.POST.get('nik')),
+				NIK		= get_secured_data(request.POST.get('nik')),
 				image 		= get_secured_data(str(request.FILES['image'])),
 				Alamat		= get_secured_data(request.POST.get('alamat')),
 
