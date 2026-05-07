@@ -3,13 +3,10 @@ dj-database-url>=2.0.0
 gunicorn>=21.0.0
 psycopg2-binary>=2.9.0
 whitenoise>=6.0.0
-
 numpy>=1.24.0,<2.0.0
 sympy>=1.12
 Pillow>=10.0.0
 opencv-python-headless>=4.8.1.78
-
 selenium>=4.0.0
-
 setuptools>=68.0.0
 wheel>=0.40.0
