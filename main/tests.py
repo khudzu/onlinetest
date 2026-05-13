@@ -2,6 +2,14 @@ from django.test import LiveServerTestCase, TestCase, tag
 from django.urls import reverse
 from selenium import webdriver
 
+from main.crypto.mceliece_reed_muller import (
+    decrypt_bits,
+    decrypt_bytes,
+    encrypt_bits,
+    encrypt_bytes,
+    generate_keypair,
+)
+
 
 @tag('functional')
 class FunctionalTestCase(LiveServerTestCase):
@@ -31,6 +39,26 @@ class MainTestCase(TestCase):
         # You can also use path names instead of explicit paths.
         response = self.client.get(reverse('main:home'))
         self.assertEqual(response.status_code, 200)
+
+
+class McElieceReedMullerTestCase(TestCase):
+    def test_bit_round_trip(self):
+        public_key, private_key = generate_keypair(order_m=4, seed=7)
+        message = [1, 0, 1, 1, 0]
+
+        ciphertext = encrypt_bits(message, public_key, seed=11)
+        plaintext = decrypt_bits(ciphertext, private_key)
+
+        self.assertEqual(plaintext.tolist(), message)
+
+    def test_byte_round_trip(self):
+        public_key, private_key = generate_keypair(order_m=4, seed=13)
+        message = b"halo"
+
+        ciphertext_blocks, padding = encrypt_bytes(message, public_key, seed=17)
+        plaintext = decrypt_bytes(ciphertext_blocks, private_key, padding)
+
+        self.assertEqual(plaintext, message)
 
 
 class MainFunctionalTestCase(FunctionalTestCase):
