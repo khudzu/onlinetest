@@ -14,9 +14,21 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def env_list(name):
+    return [value.strip() for value in os.getenv(name, '').split(',') if value.strip()]
+
+
+def env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.lower() in {'1', 'true', 'yes', 'on'}
 
 
 # Quick-start development settings
@@ -24,28 +36,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # for best-practices.
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# Please set SECRET_KEY environment variable in your production environment
-# (e.g. Heroku).
+# Please set SECRET_KEY environment variable in your production environment.
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-o4z9^d4h$n6zo%+9xpc_6j8=uy42zy-ff2$04dxohh!wlsonhh')
 
-# Automatically determine environment by detecting if DATABASE_URL variable.
-# DATABASE_URL is provided by Heroku if a database add-on is added
-# (e.g. Heroku Postgres).
-PRODUCTION = os.getenv('DATABASE_URL') is not None
+RAILWAY_ENVIRONMENT_NAME = os.getenv('RAILWAY_ENVIRONMENT_NAME')
+RAILWAY_PUBLIC_DOMAIN = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+DATABASE_URL = os.getenv('DATABASE_URL')
+PRODUCTION = RAILWAY_ENVIRONMENT_NAME is not None or DATABASE_URL is not None
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# If you want to enable debugging on Heroku for learning purposes,
-# set this to True.
-DEBUG = not PRODUCTION
+DEBUG = env_bool('DEBUG', default=not PRODUCTION)
 
-HEROKU_APP_NAME = os.getenv('HEROKU_APP_NAME', '')
-
-ALLOWED_HOSTS = [
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS')
+ALLOWED_HOSTS += [
     "web-production-cb7fc.up.railway.app",
 ]
 
+if RAILWAY_PUBLIC_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+
 if not PRODUCTION:
     ALLOWED_HOSTS += ['.localhost', '127.0.0.1', '[::1]']
+
+ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
 
 
 # Application definition
@@ -97,18 +110,27 @@ WSGI_APPLICATION = 'blog.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
 # Set database settings automatically using DATABASE_URL.
-if PRODUCTION:
-    DATABASES['default'] = dj_database_url.config(
-        conn_max_age=600, ssl_require=True
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=env_bool('DATABASE_SSL_REQUIRE', default=True),
+        )
+    }
+elif PRODUCTION:
+    raise ImproperlyConfigured(
+        'DATABASE_URL is required on Railway. Add DATABASE_URL=${{Postgres.DATABASE_URL}} '
+        'to the Django service variables, then redeploy.'
     )
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -167,6 +189,12 @@ for directory in [*STATICFILES_DIRS, STATIC_ROOT]:
 # You can remove this if it causes problems on your setup.
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-CSRF_TRUSTED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
+CSRF_TRUSTED_ORIGINS += [
     "https://web-production-cb7fc.up.railway.app",
 ]
+
+if RAILWAY_PUBLIC_DOMAIN:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RAILWAY_PUBLIC_DOMAIN}')
+
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
