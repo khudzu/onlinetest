@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.shortcuts import render, redirect
 from django.http import HttpResponseRedirect
 from django.contrib.auth import authenticate, login, logout
@@ -24,6 +25,10 @@ def get_secured_image(img, action, a, b, d):
     keyinvers = keyinvers.astype(int)
     i=0
     if action == 'ENKRIPSI':
+        if cols % 2 == 1:
+            img = cv2.copyMakeBorder(img, 0, 0, 0, 1, cv2.BORDER_REPLICATE)
+            rows, cols, ch = img.shape
+            q = np.zeros([rows, cols, ch])
         # Enkripsi Hill Cipher
         for x in range (0, rows):
             for y in range (0, cols, 2):
@@ -43,7 +48,7 @@ def get_secured_image(img, action, a, b, d):
                         l=np.matmul(key,k)%n
                         img2[x,y] = img[l[0],l[1]]
                 img=img2
-                i=i+1
+            i=i+1
         encrypted=img.astype(np.uint8)
         return encrypted
     elif action == 'DEKRIPSI':
@@ -58,7 +63,7 @@ def get_secured_image(img, action, a, b, d):
                         k=[x,y]
                         l=np.matmul(keyinvers,k)%n
                         img2[x,y] = img[l[0],l[1]]
-            img=img2
+                img=img2
             i=i+1
         img2=img.astype(np.uint8)
         #Dekripsi Hill Cipher
@@ -137,19 +142,32 @@ def create(request):
 	post_form = PostForm()
 
 	if request.method == 'POST':
-		img = cv2.imread('static/img/'+str(request.FILES['image']))
-		imc = get_secured_image(img, 'ENKRIPSI', 2, 3, 2)
-		cv2.imwrite('static/img/' + get_secured_data(str(request.FILES['image'])) + '.png', imc)
-		PostModel.objects.create(
-				Nama 		= get_secured_data(request.POST.get('nama')),
-				Password	= get_secured_data(request.POST.get('password')),
-				NIK		= get_secured_data(request.POST.get('nik')),
-				image 		= get_secured_data(str(request.FILES['image'])),
-				Alamat		= get_secured_data(request.POST.get('alamat')),
+		post_form = PostForm(request.POST, request.FILES)
+		if post_form.is_valid():
+			uploaded_image = post_form.cleaned_data['image']
+			image_bytes = np.frombuffer(uploaded_image.read(), np.uint8)
+			img = cv2.imdecode(image_bytes, cv2.IMREAD_COLOR)
 
-			)
+			if img is None:
+				post_form.add_error('image', 'File gambar tidak bisa dibaca.')
+			else:
+				secured_image_name = get_secured_data(uploaded_image.name)
+				imc = get_secured_image(img, 'ENKRIPSI', 2, 3, 2)
 
-		return HttpResponseRedirect('/data/')
+				static_img_dir = settings.STATIC_ROOT / 'img'
+				static_img_dir.mkdir(parents=True, exist_ok=True)
+				cv2.imwrite(str(static_img_dir / f'{secured_image_name}.png'), imc)
+
+				PostModel.objects.create(
+						Nama 		= get_secured_data(post_form.cleaned_data['nama']),
+						Password	= get_secured_data(post_form.cleaned_data['password']),
+						NIK		= get_secured_data(post_form.cleaned_data['nik']),
+						image 		= secured_image_name,
+						Alamat		= get_secured_data(post_form.cleaned_data['alamat']),
+
+					)
+
+				return HttpResponseRedirect('/data/')
 
 
 	context = {
@@ -198,7 +216,6 @@ def logout(request):
 	}
 	request.user.is_authenticated == False
 	return redirect('/')
-
 
 
 
