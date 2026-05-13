@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.http import FileResponse, Http404
+from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.http import HttpResponseRedirect
 from django.contrib.auth import authenticate, login, logout
@@ -13,6 +14,7 @@ from sympy import *
 import cv2
 import numpy as np
 from pathlib import Path
+from io import BytesIO
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -25,6 +27,25 @@ def get_image_url(image_name):
 	if not filename.endswith('.png'):
 		filename = f'{filename}.png'
 	return f'/encrypted-images/{quote(filename)}'
+
+
+def get_decrypted_image_url(image_name):
+	filename = Path(str(image_name)).name
+	if not filename.endswith('.png'):
+		filename = f'{filename}.png'
+	return f'/decrypted-images/{quote(filename)}'
+
+
+def find_stored_image(filename):
+	if not filename.endswith('.png'):
+		filename = f'{filename}.png'
+
+	for image_dir in [ENCRYPTED_IMAGE_DIR, STATIC_IMAGE_DIR]:
+		image_path = image_dir / filename
+		if image_path.exists():
+			return image_path
+
+	return None
 
 def get_secured_image(img, action, a, b, d):
     #---------------Read Image to Encrypt---------------
@@ -128,7 +149,7 @@ def data(request):
 	posts = PostModel.objects.all()
 
 	for post in posts:
-		post.image=get_image_url(post.image)
+		post.image=get_decrypted_image_url(post.image)
 		post.Nama=get_data(post.Nama)
 		post.Alamat=get_data(post.Alamat)
 		post.NIK=get_data(post.NIK)
@@ -192,15 +213,28 @@ def create(request):
 
 
 def encrypted_image(request, filename):
-	if not filename.endswith('.png'):
-		filename = f'{filename}.png'
-
-	for image_dir in [ENCRYPTED_IMAGE_DIR, STATIC_IMAGE_DIR]:
-		image_path = image_dir / filename
-		if image_path.exists():
-			return FileResponse(open(image_path, 'rb'), content_type='image/png')
+	image_path = find_stored_image(filename)
+	if image_path:
+		return FileResponse(open(image_path, 'rb'), content_type='image/png')
 
 	raise Http404('Gambar tidak ditemukan.')
+
+
+def decrypted_image(request, filename):
+	image_path = find_stored_image(filename)
+	if not image_path:
+		raise Http404('Gambar tidak ditemukan.')
+
+	encrypted = cv2.imread(str(image_path))
+	if encrypted is None:
+		raise Http404('Gambar tidak bisa dibaca.')
+
+	decrypted = get_secured_image(encrypted, 'DEKRIPSI', 2, 3, 2)
+	ok, buffer = cv2.imencode('.png', decrypted)
+	if not ok:
+		raise Http404('Gambar tidak bisa didekripsi.')
+
+	return HttpResponse(BytesIO(buffer).getvalue(), content_type='image/png')
 
 
 def login(request):
@@ -241,5 +275,4 @@ def logout(request):
 	}
 	request.user.is_authenticated == False
 	return redirect('/')
-
 
