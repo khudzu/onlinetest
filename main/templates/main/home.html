@@ -10,8 +10,6 @@
 	{% for post in posts  %}
 		<img src="{{post.image}}" width="100px"><br>
 		{% if show_ciphertext %}
-			<p>Cipher image:</p>
-			<pre style="white-space: pre-wrap; overflow-wrap: anywhere;">{{post.image_ciphertext}}</pre>
 			<p>Nama ciphertext:</p>
 			<pre style="white-space: pre-wrap; overflow-wrap: anywhere;">{{post.Nama}}</pre>
 			<p>Alamat ciphertext:</p>
