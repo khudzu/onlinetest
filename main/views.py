@@ -12,7 +12,6 @@ from main.crypto.aes_reed_muller import (
 	encrypt_image_bytes,
 	encrypt_text,
 	generate_aes_key,
-	generate_key_salt,
 	get_payload_ciphertext_bytes,
 	get_payload_ciphertext_text,
 	unwrap_aes_key,
@@ -282,8 +281,6 @@ def create(request):
 				post_form.add_error('image', 'File gambar tidak bisa dibaca.')
 			else:
 				aes_key = generate_aes_key()
-				key_salt = generate_key_salt()
-				encryption_key = post_form.cleaned_data['encryption_key']
 				secured_image_name = f'{uuid4().hex}.aes'
 				encrypted_image = encrypt_image_bytes(uploaded_image_bytes, aes_key)
 
@@ -298,8 +295,7 @@ def create(request):
 						image 		= secured_image_name,
 						image_ciphertext = encrypted_image.decode('utf-8'),
 						Alamat		= encrypt_text(post_form.cleaned_data['alamat'], aes_key),
-						aes_key		= wrap_aes_key(aes_key, encryption_key, key_salt),
-						key_salt	= key_salt,
+						aes_key		= wrap_aes_key(aes_key),
 
 					)
 
