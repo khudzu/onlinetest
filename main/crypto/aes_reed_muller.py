@@ -78,6 +78,13 @@ def decrypt_image_bytes(payload, aes_key):
     return AESGCM(aes_key).decrypt(nonce, ciphertext, None)
 
 
+def get_payload_ciphertext_bytes(payload):
+    if isinstance(payload, bytes):
+        payload = payload.decode("utf-8")
+    data = json.loads(payload)
+    return _b64decode(data["ciphertext"])
+
+
 def wrap_aes_key(aes_key):
     public_key, _ = _reed_muller_keypair()
     blocks, padding = encrypt_bytes(aes_key, public_key)

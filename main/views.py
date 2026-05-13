@@ -11,6 +11,7 @@ from main.crypto.aes_reed_muller import (
 	encrypt_image_bytes,
 	encrypt_text,
 	generate_aes_key,
+	get_payload_ciphertext_bytes,
 	unwrap_aes_key,
 	wrap_aes_key,
 )
@@ -21,6 +22,7 @@ from .forms import PostForm, LoginForm
 from .models import PostModel
 from sympy import *
 import cv2
+import json
 import numpy as np
 from pathlib import Path
 from io import BytesIO
@@ -56,6 +58,26 @@ def find_stored_image(filename):
 			return image_path
 
 	return None
+
+
+def ciphertext_preview_png(encrypted_payload):
+	try:
+		ciphertext = get_payload_ciphertext_bytes(encrypted_payload)
+	except (UnicodeDecodeError, json.JSONDecodeError, KeyError, ValueError):
+		ciphertext = encrypted_payload
+
+	values = np.frombuffer(ciphertext, dtype=np.uint8)
+	if values.size == 0:
+		values = np.zeros(1, dtype=np.uint8)
+
+	side = int(np.ceil(np.sqrt(values.size)))
+	padded = np.pad(values, (0, side * side - values.size), mode='constant')
+	noise = padded.reshape((side, side))
+	noise = cv2.resize(noise, (256, 256), interpolation=cv2.INTER_NEAREST)
+	ok, buffer = cv2.imencode('.png', noise)
+	if not ok:
+		raise Http404('Ciphertext tidak bisa divisualisasikan.')
+	return BytesIO(buffer).getvalue()
 
 def get_secured_image(img, action, a, b, d):
     #---------------Read Image to Encrypt---------------
@@ -176,6 +198,7 @@ def data(request):
 		'page_title':'Data anda akan tersimpan dengan aman',
 		'posts':posts,
 		'db_latency_ms':db_latency_ms,
+		'show_ciphertext':False,
 	}
 
 	return render(request,'main/home.html',context)
@@ -193,6 +216,7 @@ def home(request):
 		'page_title':'Data anda akan tersimpan dengan aman',
 		'posts':posts,
 		'db_latency_ms':db_latency_ms,
+		'show_ciphertext':True,
 	}
 	return render(request,'main/home.html',context)
 
@@ -241,6 +265,11 @@ def create(request):
 def encrypted_image(request, filename):
 	image_path = find_stored_image(filename)
 	if image_path:
+		if image_path.suffix == '.aes':
+			return HttpResponse(
+				ciphertext_preview_png(image_path.read_bytes()),
+				content_type='image/png',
+			)
 		return FileResponse(open(image_path, 'rb'), content_type='image/png')
 
 	raise Http404('Gambar tidak ditemukan.')
