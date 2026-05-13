@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.http import FileResponse, Http404
 from django.shortcuts import render, redirect
 from django.http import HttpResponseRedirect
 from django.contrib.auth import authenticate, login, logout
@@ -11,8 +13,18 @@ from sympy import *
 import cv2
 import numpy as np
 from pathlib import Path
+from urllib.parse import quote
+from uuid import uuid4
 
 STATIC_IMAGE_DIR = Path(__file__).resolve().parent.parent / 'static' / 'img'
+ENCRYPTED_IMAGE_DIR = settings.MEDIA_ROOT / 'encrypted_images'
+
+
+def get_image_url(image_name):
+	filename = Path(str(image_name)).name
+	if not filename.endswith('.png'):
+		filename = f'{filename}.png'
+	return f'/encrypted-images/{quote(filename)}'
 
 def get_secured_image(img, action, a, b, d):
     #---------------Read Image to Encrypt---------------
@@ -116,7 +128,7 @@ def data(request):
 	posts = PostModel.objects.all()
 
 	for post in posts:
-		post.image='/static/img/'+str(post.image)+'.png'
+		post.image=get_image_url(post.image)
 		post.Nama=get_data(post.Nama)
 		post.Alamat=get_data(post.Alamat)
 		post.NIK=get_data(post.NIK)
@@ -130,7 +142,7 @@ def data(request):
 def home(request):
 	posts = PostModel.objects.all()
 	for post in posts:
-		post.image='/static/img/'+str(post.image)+'.png'
+		post.image=get_image_url(post.image)
 		post.Nama=post.Nama
 		post.Alamat=post.Alamat
 		post.NIK=post.NIK
@@ -153,11 +165,11 @@ def create(request):
 			if img is None:
 				post_form.add_error('image', 'File gambar tidak bisa dibaca.')
 			else:
-				secured_image_name = get_secured_data(uploaded_image.name)
+				secured_image_name = f'{uuid4().hex}.png'
 				imc = get_secured_image(img, 'ENKRIPSI', 2, 3, 2)
 
-				STATIC_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-				cv2.imwrite(str(STATIC_IMAGE_DIR / f'{secured_image_name}.png'), imc)
+				ENCRYPTED_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+				cv2.imwrite(str(ENCRYPTED_IMAGE_DIR / secured_image_name), imc)
 
 				PostModel.objects.create(
 						Nama 		= get_secured_data(post_form.cleaned_data['nama']),
@@ -177,6 +189,18 @@ def create(request):
 	}
 
 	return render(request,'main/create.html',context)
+
+
+def encrypted_image(request, filename):
+	if not filename.endswith('.png'):
+		filename = f'{filename}.png'
+
+	for image_dir in [ENCRYPTED_IMAGE_DIR, STATIC_IMAGE_DIR]:
+		image_path = image_dir / filename
+		if image_path.exists():
+			return FileResponse(open(image_path, 'rb'), content_type='image/png')
+
+	raise Http404('Gambar tidak ditemukan.')
 
 
 def login(request):
@@ -217,6 +241,5 @@ def logout(request):
 	}
 	request.user.is_authenticated == False
 	return redirect('/')
-
 
 

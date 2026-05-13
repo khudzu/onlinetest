@@ -187,6 +187,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
 STATIC_URL = '/static/'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # This is the directory for storing `collectstatic` results.
 # This shouldn't be included in your Git repository.
@@ -198,7 +200,7 @@ STATICFILES_DIRS = [
 ]
 
 # Make sure the directories exist to prevent errors when doing `collectstatic`.
-for directory in [*STATICFILES_DIRS, STATIC_ROOT]:
+for directory in [*STATICFILES_DIRS, STATIC_ROOT, MEDIA_ROOT]:
     directory.mkdir(exist_ok=True)
 
 # Enable compression features of whitenoise without failing on missing manifest entries.
