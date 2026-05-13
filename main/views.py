@@ -5,6 +5,15 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponseRedirect
 from django.contrib.auth import authenticate, login, logout
 from main.functions.functions import handle_uploaded_file
+from main.crypto.aes_reed_muller import (
+	decrypt_image_bytes,
+	decrypt_text,
+	encrypt_image_bytes,
+	encrypt_text,
+	generate_aes_key,
+	unwrap_aes_key,
+	wrap_aes_key,
+)
 
 # Create your views here.
 
@@ -15,6 +24,7 @@ import cv2
 import numpy as np
 from pathlib import Path
 from io import BytesIO
+from time import perf_counter
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -24,20 +34,20 @@ ENCRYPTED_IMAGE_DIR = settings.MEDIA_ROOT / 'encrypted_images'
 
 def get_image_url(image_name):
 	filename = Path(str(image_name)).name
-	if not filename.endswith('.png'):
+	if not Path(filename).suffix:
 		filename = f'{filename}.png'
 	return f'/encrypted-images/{quote(filename)}'
 
 
 def get_decrypted_image_url(image_name):
 	filename = Path(str(image_name)).name
-	if not filename.endswith('.png'):
+	if not Path(filename).suffix:
 		filename = f'{filename}.png'
 	return f'/decrypted-images/{quote(filename)}'
 
 
 def find_stored_image(filename):
-	if not filename.endswith('.png'):
+	if not Path(filename).suffix:
 		filename = f'{filename}.png'
 
 	for image_dir in [ENCRYPTED_IMAGE_DIR, STATIC_IMAGE_DIR]:
@@ -146,22 +156,34 @@ def get_data(p):
 	return cm
 
 def data(request):
-	posts = PostModel.objects.all()
+	start_time = perf_counter()
+	posts = list(PostModel.objects.all())
+	db_latency_ms = (perf_counter() - start_time) * 1000
 
 	for post in posts:
 		post.image=get_decrypted_image_url(post.image)
-		post.Nama=get_data(post.Nama)
-		post.Alamat=get_data(post.Alamat)
-		post.NIK=get_data(post.NIK)
+		if post.aes_key:
+			aes_key = unwrap_aes_key(post.aes_key)
+			post.Nama=decrypt_text(post.Nama, aes_key)
+			post.Password=decrypt_text(post.Password, aes_key)
+			post.Alamat=decrypt_text(post.Alamat, aes_key)
+			post.NIK=decrypt_text(post.NIK, aes_key)
+		else:
+			post.Nama=get_data(post.Nama)
+			post.Alamat=get_data(post.Alamat)
+			post.NIK=get_data(post.NIK)
 	context = {
 		'page_title':'Data anda akan tersimpan dengan aman',
 		'posts':posts,
+		'db_latency_ms':db_latency_ms,
 	}
 
 	return render(request,'main/home.html',context)
 
 def home(request):
-	posts = PostModel.objects.all()
+	start_time = perf_counter()
+	posts = list(PostModel.objects.all())
+	db_latency_ms = (perf_counter() - start_time) * 1000
 	for post in posts:
 		post.image=get_image_url(post.image)
 		post.Nama=post.Nama
@@ -170,6 +192,7 @@ def home(request):
 	context = {
 		'page_title':'Data anda akan tersimpan dengan aman',
 		'posts':posts,
+		'db_latency_ms':db_latency_ms,
 	}
 	return render(request,'main/home.html',context)
 
@@ -180,24 +203,27 @@ def create(request):
 		post_form = PostForm(request.POST, request.FILES)
 		if post_form.is_valid():
 			uploaded_image = post_form.cleaned_data['image']
-			image_bytes = np.frombuffer(uploaded_image.read(), np.uint8)
+			uploaded_image_bytes = uploaded_image.read()
+			image_bytes = np.frombuffer(uploaded_image_bytes, np.uint8)
 			img = cv2.imdecode(image_bytes, cv2.IMREAD_COLOR)
 
 			if img is None:
 				post_form.add_error('image', 'File gambar tidak bisa dibaca.')
 			else:
-				secured_image_name = f'{uuid4().hex}.png'
-				imc = get_secured_image(img, 'ENKRIPSI', 2, 3, 2)
+				aes_key = generate_aes_key()
+				secured_image_name = f'{uuid4().hex}.aes'
+				encrypted_image = encrypt_image_bytes(uploaded_image_bytes, aes_key)
 
 				ENCRYPTED_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-				cv2.imwrite(str(ENCRYPTED_IMAGE_DIR / secured_image_name), imc)
+				(ENCRYPTED_IMAGE_DIR / secured_image_name).write_bytes(encrypted_image)
 
 				PostModel.objects.create(
-						Nama 		= get_secured_data(post_form.cleaned_data['nama']),
-						Password	= get_secured_data(post_form.cleaned_data['password']),
-						NIK		= get_secured_data(post_form.cleaned_data['nik']),
+						Nama 		= encrypt_text(post_form.cleaned_data['nama'], aes_key),
+						Password	= encrypt_text(post_form.cleaned_data['password'], aes_key),
+						NIK		= encrypt_text(post_form.cleaned_data['nik'], aes_key),
 						image 		= secured_image_name,
-						Alamat		= get_secured_data(post_form.cleaned_data['alamat']),
+						Alamat		= encrypt_text(post_form.cleaned_data['alamat'], aes_key),
+						aes_key		= wrap_aes_key(aes_key),
 
 					)
 
@@ -224,6 +250,21 @@ def decrypted_image(request, filename):
 	image_path = find_stored_image(filename)
 	if not image_path:
 		raise Http404('Gambar tidak ditemukan.')
+
+	post = PostModel.objects.filter(image=Path(filename).name).first()
+	if post and post.aes_key:
+		aes_key = unwrap_aes_key(post.aes_key)
+		try:
+			image_bytes = decrypt_image_bytes(image_path.read_bytes(), aes_key)
+		except (ValueError, KeyError):
+			raise Http404('Gambar tidak bisa didekripsi.')
+		image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+		if image is None:
+			raise Http404('Gambar tidak bisa dibaca.')
+		ok, buffer = cv2.imencode('.png', image)
+		if not ok:
+			raise Http404('Gambar tidak bisa ditampilkan.')
+		return HttpResponse(BytesIO(buffer).getvalue(), content_type='image/png')
 
 	encrypted = cv2.imread(str(image_path))
 	if encrypted is None:
@@ -275,4 +316,3 @@ def logout(request):
 	}
 	request.user.is_authenticated == False
 	return redirect('/')
-

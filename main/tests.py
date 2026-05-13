@@ -9,6 +9,15 @@ from main.crypto.mceliece_reed_muller import (
     encrypt_bytes,
     generate_keypair,
 )
+from main.crypto.aes_reed_muller import (
+    decrypt_image_bytes,
+    decrypt_text,
+    encrypt_image_bytes,
+    encrypt_text,
+    generate_aes_key,
+    unwrap_aes_key,
+    wrap_aes_key,
+)
 
 
 @tag('functional')
@@ -59,6 +68,26 @@ class McElieceReedMullerTestCase(TestCase):
         plaintext = decrypt_bytes(ciphertext_blocks, private_key, padding)
 
         self.assertEqual(plaintext, message)
+
+    def test_aes_key_wrap_and_text_round_trip(self):
+        aes_key = generate_aes_key()
+        wrapped_key = wrap_aes_key(aes_key)
+        unwrapped_key = unwrap_aes_key(wrapped_key)
+
+        ciphertext = encrypt_text("rahasia", aes_key)
+        plaintext = decrypt_text(ciphertext, unwrapped_key)
+
+        self.assertEqual(unwrapped_key, aes_key)
+        self.assertEqual(plaintext, "rahasia")
+
+    def test_aes_image_round_trip(self):
+        aes_key = generate_aes_key()
+        image_bytes = b"fake-image-bytes"
+
+        ciphertext = encrypt_image_bytes(image_bytes, aes_key)
+        plaintext = decrypt_image_bytes(ciphertext, aes_key)
+
+        self.assertEqual(plaintext, image_bytes)
 
 
 class MainFunctionalTestCase(FunctionalTestCase):
