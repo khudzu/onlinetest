@@ -4,6 +4,18 @@
 {% block contents %}
 	<h1>{{page_title}}</h1>
 	<p>Database latency: {{db_latency_ms|floatformat:2}} ms</p>
+	{% if decryption_form %}
+		<form method="POST">
+			{% csrf_token %}
+			<table>
+				{{decryption_form.as_table}}
+			</table>
+			<button type="Submit">Dekripsi</button>
+		</form>
+	{% endif %}
+	{% if decryption_error %}
+		<p>{{decryption_error}}</p>
+	{% endif %}
 	<br>
 
 	<br>

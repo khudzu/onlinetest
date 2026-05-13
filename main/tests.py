@@ -80,6 +80,15 @@ class McElieceReedMullerTestCase(TestCase):
         self.assertEqual(unwrapped_key, aes_key)
         self.assertEqual(plaintext, "rahasia")
 
+    def test_password_wrapped_aes_key_round_trip(self):
+        aes_key = generate_aes_key()
+        salt = "MDEyMzQ1Njc4OWFiY2RlZg=="
+
+        wrapped_key = wrap_aes_key(aes_key, "kunci-user", salt)
+        unwrapped_key = unwrap_aes_key(wrapped_key, "kunci-user", salt)
+
+        self.assertEqual(unwrapped_key, aes_key)
+
     def test_aes_image_round_trip(self):
         aes_key = generate_aes_key()
         image_bytes = b"fake-image-bytes"

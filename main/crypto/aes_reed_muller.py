@@ -5,6 +5,8 @@ import os
 
 import numpy as np
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from django.conf import settings
 
 from main.crypto.mceliece_reed_muller import (
@@ -22,13 +24,33 @@ def _b64decode(data):
     return base64.urlsafe_b64decode(data.encode("ascii"))
 
 
-def _keypair_seed():
-    digest = hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
+def generate_key_salt():
+    return _b64encode(os.urandom(16))
+
+
+def _seed_material(password=None, salt=None):
+    if password is None:
+        return settings.SECRET_KEY.encode("utf-8")
+
+    if salt is None:
+        raise ValueError("salt is required when password is provided.")
+
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=_b64decode(salt),
+        iterations=200000,
+    )
+    return kdf.derive(str(password).encode("utf-8"))
+
+
+def _keypair_seed(password=None, salt=None):
+    digest = hashlib.sha256(_seed_material(password, salt)).digest()
     return int.from_bytes(digest[:8], "big")
 
 
-def _reed_muller_keypair():
-    return generate_keypair(order_m=4, seed=_keypair_seed())
+def _reed_muller_keypair(password=None, salt=None):
+    return generate_keypair(order_m=4, seed=_keypair_seed(password, salt))
 
 
 def generate_aes_key():
@@ -95,8 +117,8 @@ def get_payload_ciphertext_text(payload):
         return payload
 
 
-def wrap_aes_key(aes_key):
-    public_key, _ = _reed_muller_keypair()
+def wrap_aes_key(aes_key, password=None, salt=None):
+    public_key, _ = _reed_muller_keypair(password, salt)
     blocks, padding = encrypt_bytes(aes_key, public_key)
     encoded_blocks = [
         _b64encode(np.packbits(block, bitorder="big").tobytes())
@@ -112,8 +134,8 @@ def wrap_aes_key(aes_key):
     )
 
 
-def unwrap_aes_key(payload):
-    _, private_key = _reed_muller_keypair()
+def unwrap_aes_key(payload, password=None, salt=None):
+    _, private_key = _reed_muller_keypair(password, salt)
     data = json.loads(payload)
     blocks = [
         np.unpackbits(np.frombuffer(_b64decode(block), dtype=np.uint8), bitorder="big")[
