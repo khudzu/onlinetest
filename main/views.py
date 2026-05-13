@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.shortcuts import render, redirect
 from django.http import HttpResponseRedirect
 from django.contrib.auth import authenticate, login, logout
@@ -11,6 +10,9 @@ from .models import PostModel
 from sympy import *
 import cv2
 import numpy as np
+from pathlib import Path
+
+STATIC_IMAGE_DIR = Path(__file__).resolve().parent.parent / 'static' / 'img'
 
 def get_secured_image(img, action, a, b, d):
     #---------------Read Image to Encrypt---------------
@@ -114,7 +116,7 @@ def data(request):
 	posts = PostModel.objects.all()
 
 	for post in posts:
-		post.image='/static/img/'+get_data(str(post.image))
+		post.image='/static/img/'+str(post.image)+'.png'
 		post.Nama=get_data(post.Nama)
 		post.Alamat=get_data(post.Alamat)
 		post.NIK=get_data(post.NIK)
@@ -154,9 +156,8 @@ def create(request):
 				secured_image_name = get_secured_data(uploaded_image.name)
 				imc = get_secured_image(img, 'ENKRIPSI', 2, 3, 2)
 
-				static_img_dir = settings.STATIC_ROOT / 'img'
-				static_img_dir.mkdir(parents=True, exist_ok=True)
-				cv2.imwrite(str(static_img_dir / f'{secured_image_name}.png'), imc)
+				STATIC_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+				cv2.imwrite(str(STATIC_IMAGE_DIR / f'{secured_image_name}.png'), imc)
 
 				PostModel.objects.create(
 						Nama 		= get_secured_data(post_form.cleaned_data['nama']),
@@ -216,7 +217,6 @@ def logout(request):
 	}
 	request.user.is_authenticated == False
 	return redirect('/')
-
 
 
 
