@@ -7,6 +7,7 @@ class PostModel(models.Model):
 	Password	= models.TextField()
 	NIK         = models.TextField()
 	image 		= models.CharField(max_length=255, blank=True, default='default.png', null=True)
+	image_ciphertext = models.TextField(blank=True, default='')
 	Alamat		= models.TextField()
 	aes_key		= models.TextField(blank=True, default='')
 

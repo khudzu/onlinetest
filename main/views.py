@@ -12,6 +12,7 @@ from main.crypto.aes_reed_muller import (
 	encrypt_text,
 	generate_aes_key,
 	get_payload_ciphertext_bytes,
+	get_payload_ciphertext_text,
 	unwrap_aes_key,
 	wrap_aes_key,
 )
@@ -209,9 +210,10 @@ def home(request):
 	db_latency_ms = (perf_counter() - start_time) * 1000
 	for post in posts:
 		post.image=get_image_url(post.image)
-		post.Nama=post.Nama
-		post.Alamat=post.Alamat
-		post.NIK=post.NIK
+		post.Nama=get_payload_ciphertext_text(post.Nama)
+		post.Alamat=get_payload_ciphertext_text(post.Alamat)
+		post.NIK=get_payload_ciphertext_text(post.NIK)
+		post.image_ciphertext=get_payload_ciphertext_text(post.image_ciphertext)
 	context = {
 		'page_title':'Data anda akan tersimpan dengan aman',
 		'posts':posts,
@@ -246,6 +248,7 @@ def create(request):
 						Password	= encrypt_text(post_form.cleaned_data['password'], aes_key),
 						NIK		= encrypt_text(post_form.cleaned_data['nik'], aes_key),
 						image 		= secured_image_name,
+						image_ciphertext = encrypted_image.decode('utf-8'),
 						Alamat		= encrypt_text(post_form.cleaned_data['alamat'], aes_key),
 						aes_key		= wrap_aes_key(aes_key),
 
@@ -272,19 +275,28 @@ def encrypted_image(request, filename):
 			)
 		return FileResponse(open(image_path, 'rb'), content_type='image/png')
 
+	post = PostModel.objects.filter(image=Path(filename).name).first()
+	if post and post.image_ciphertext:
+		return HttpResponse(
+			ciphertext_preview_png(post.image_ciphertext.encode('utf-8')),
+			content_type='image/png',
+		)
+
 	raise Http404('Gambar tidak ditemukan.')
 
 
 def decrypted_image(request, filename):
 	image_path = find_stored_image(filename)
-	if not image_path:
-		raise Http404('Gambar tidak ditemukan.')
-
 	post = PostModel.objects.filter(image=Path(filename).name).first()
 	if post and post.aes_key:
 		aes_key = unwrap_aes_key(post.aes_key)
 		try:
-			image_bytes = decrypt_image_bytes(image_path.read_bytes(), aes_key)
+			encrypted_payload = (
+				image_path.read_bytes()
+				if image_path
+				else post.image_ciphertext.encode('utf-8')
+			)
+			image_bytes = decrypt_image_bytes(encrypted_payload, aes_key)
 		except (ValueError, KeyError):
 			raise Http404('Gambar tidak bisa didekripsi.')
 		image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
@@ -294,6 +306,9 @@ def decrypted_image(request, filename):
 		if not ok:
 			raise Http404('Gambar tidak bisa ditampilkan.')
 		return HttpResponse(BytesIO(buffer).getvalue(), content_type='image/png')
+
+	if not image_path:
+		raise Http404('Gambar tidak ditemukan.')
 
 	encrypted = cv2.imread(str(image_path))
 	if encrypted is None:

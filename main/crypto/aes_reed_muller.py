@@ -85,6 +85,16 @@ def get_payload_ciphertext_bytes(payload):
     return _b64decode(data["ciphertext"])
 
 
+def get_payload_ciphertext_text(payload):
+    if isinstance(payload, bytes):
+        payload = payload.decode("utf-8")
+    try:
+        data = json.loads(payload)
+        return data["ciphertext"]
+    except (TypeError, ValueError, KeyError, json.JSONDecodeError):
+        return payload
+
+
 def wrap_aes_key(aes_key):
     public_key, _ = _reed_muller_keypair()
     blocks, padding = encrypt_bytes(aes_key, public_key)
