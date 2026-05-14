@@ -217,17 +217,23 @@ def data(request):
 				post.Password=decrypt_text(post.Password, aes_key)
 				post.Alamat=decrypt_text(post.Alamat, aes_key)
 				post.NIK=decrypt_text(post.NIK, aes_key)
-			except (ValueError, KeyError, json.JSONDecodeError):
+			except Exception:
 				decryption_error = 'Kunci dekripsi salah untuk sebagian data.'
 				post.Nama='[kunci dekripsi salah]'
 				post.Alamat='[kunci dekripsi salah]'
 				post.NIK='[kunci dekripsi salah]'
 		elif post.aes_key and not post.key_salt:
-			aes_key = unwrap_aes_key(post.aes_key)
-			post.Nama=decrypt_text(post.Nama, aes_key)
-			post.Password=decrypt_text(post.Password, aes_key)
-			post.Alamat=decrypt_text(post.Alamat, aes_key)
-			post.NIK=decrypt_text(post.NIK, aes_key)
+			try:
+				aes_key = unwrap_aes_key(post.aes_key)
+				post.Nama=decrypt_text(post.Nama, aes_key)
+				post.Password=decrypt_text(post.Password, aes_key)
+				post.Alamat=decrypt_text(post.Alamat, aes_key)
+				post.NIK=decrypt_text(post.NIK, aes_key)
+			except Exception:
+				decryption_error = 'Sebagian data lama tidak bisa didekripsi.'
+				post.Nama='[gagal dekripsi]'
+				post.Alamat='[gagal dekripsi]'
+				post.NIK='[gagal dekripsi]'
 		elif post.aes_key:
 			post.Nama='[masukkan kunci dekripsi]'
 			post.Alamat='[masukkan kunci dekripsi]'

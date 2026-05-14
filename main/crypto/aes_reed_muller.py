@@ -152,7 +152,10 @@ def wrap_aes_key(aes_key, password=None, salt=None):
 def unwrap_aes_key(payload, password=None, salt=None):
     data = json.loads(payload)
     if data.get("scheme") == "double-wrap-repetition":
-        return unwrap_aes_key_double(payload, password, salt)
+        try:
+            return unwrap_aes_key_double(payload, password, salt)
+        except ValueError:
+            pass
     return _unwrap_aes_key_once(data, password, salt, label="A")
 
 
