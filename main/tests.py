@@ -16,7 +16,9 @@ from main.crypto.aes_reed_muller import (
     encrypt_text,
     generate_aes_key,
     unwrap_aes_key,
+    unwrap_aes_key_double,
     wrap_aes_key,
+    wrap_aes_key_double,
 )
 
 
@@ -86,6 +88,14 @@ class McElieceReedMullerTestCase(TestCase):
 
         wrapped_key = wrap_aes_key(aes_key, "kunci-user", salt)
         unwrapped_key = unwrap_aes_key(wrapped_key, "kunci-user", salt)
+
+        self.assertEqual(unwrapped_key, aes_key)
+
+    def test_double_wrapped_aes_key_round_trip(self):
+        aes_key = generate_aes_key()
+
+        wrapped_key = wrap_aes_key_double(aes_key)
+        unwrapped_key = unwrap_aes_key_double(wrapped_key)
 
         self.assertEqual(unwrapped_key, aes_key)
 

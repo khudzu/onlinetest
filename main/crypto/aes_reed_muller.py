@@ -28,9 +28,9 @@ def generate_key_salt():
     return _b64encode(os.urandom(16))
 
 
-def _seed_material(password=None, salt=None):
+def _seed_material(password=None, salt=None, label="A"):
     if password is None:
-        return settings.SECRET_KEY.encode("utf-8")
+        return f"{settings.SECRET_KEY}:{label}".encode("utf-8")
 
     if salt is None:
         raise ValueError("salt is required when password is provided.")
@@ -41,16 +41,16 @@ def _seed_material(password=None, salt=None):
         salt=_b64decode(salt),
         iterations=200000,
     )
-    return kdf.derive(str(password).encode("utf-8"))
+    return kdf.derive(f"{password}:{label}".encode("utf-8"))
 
 
-def _keypair_seed(password=None, salt=None):
-    digest = hashlib.sha256(_seed_material(password, salt)).digest()
+def _keypair_seed(password=None, salt=None, label="A"):
+    digest = hashlib.sha256(_seed_material(password, salt, label)).digest()
     return int.from_bytes(digest[:8], "big")
 
 
-def _reed_muller_keypair(password=None, salt=None):
-    return generate_keypair(order_m=4, seed=_keypair_seed(password, salt))
+def _reed_muller_keypair(password=None, salt=None, label="A"):
+    return generate_keypair(order_m=4, seed=_keypair_seed(password, salt, label))
 
 
 def generate_aes_key():
@@ -117,8 +117,8 @@ def get_payload_ciphertext_text(payload):
         return payload
 
 
-def wrap_aes_key(aes_key, password=None, salt=None):
-    public_key, _ = _reed_muller_keypair(password, salt)
+def _wrap_aes_key_once(aes_key, password=None, salt=None, label="A"):
+    public_key, _ = _reed_muller_keypair(password, salt, label)
     blocks, padding = encrypt_bytes(aes_key, public_key)
     encoded_blocks = [
         _b64encode(np.packbits(block, bitorder="big").tobytes())
@@ -134,9 +134,8 @@ def wrap_aes_key(aes_key, password=None, salt=None):
     )
 
 
-def unwrap_aes_key(payload, password=None, salt=None):
-    _, private_key = _reed_muller_keypair(password, salt)
-    data = json.loads(payload)
+def _unwrap_aes_key_once(data, password=None, salt=None, label="A"):
+    _, private_key = _reed_muller_keypair(password, salt, label)
     blocks = [
         np.unpackbits(np.frombuffer(_b64decode(block), dtype=np.uint8), bitorder="big")[
             : private_key.public_key.generator.shape[1]
@@ -144,3 +143,52 @@ def unwrap_aes_key(payload, password=None, salt=None):
         for block in data["blocks"]
     ]
     return decrypt_bytes(blocks, private_key, data.get("padding", 0))
+
+
+def wrap_aes_key(aes_key, password=None, salt=None):
+    return _wrap_aes_key_once(aes_key, password, salt, label="A")
+
+
+def unwrap_aes_key(payload, password=None, salt=None):
+    data = json.loads(payload)
+    if data.get("scheme") == "double-wrap-repetition":
+        return unwrap_aes_key_double(payload, password, salt)
+    return _unwrap_aes_key_once(data, password, salt, label="A")
+
+
+def wrap_aes_key_double(aes_key, password=None, salt=None, repetitions=3):
+    data = {
+        "scheme": "double-wrap-repetition",
+        "alg": "McEliece-RM(1,4)",
+        "repetition": repetitions,
+    }
+    for label in ["A", "B"]:
+        for index in range(1, repetitions + 1):
+            data[f"wrapped_DEK_{label}_{index}"] = json.loads(
+                _wrap_aes_key_once(aes_key, password, salt, label)
+            )
+    return json.dumps(data, separators=(",", ":"))
+
+
+def unwrap_aes_key_double(payload, password=None, salt=None):
+    data = json.loads(payload)
+    candidates = []
+
+    for label in ["A", "B"]:
+        for index in range(1, data.get("repetition", 3) + 1):
+            wrapped = data.get(f"wrapped_DEK_{label}_{index}")
+            if not wrapped:
+                continue
+            try:
+                candidates.append(_unwrap_aes_key_once(wrapped, password, salt, label))
+            except (ValueError, KeyError, json.JSONDecodeError):
+                continue
+
+    if not candidates:
+        raise ValueError("No valid repeated wrapped DEK could be decrypted.")
+
+    counts = {}
+    for candidate in candidates:
+        counts[candidate] = counts.get(candidate, 0) + 1
+
+    return max(counts, key=counts.get)

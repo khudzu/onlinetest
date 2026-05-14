@@ -16,6 +16,7 @@ from main.crypto.aes_reed_muller import (
 	get_payload_ciphertext_text,
 	unwrap_aes_key,
 	wrap_aes_key,
+	wrap_aes_key_double,
 )
 
 # Create your views here.
@@ -295,7 +296,7 @@ def create(request):
 						image 		= secured_image_name,
 						image_ciphertext = encrypted_image.decode('utf-8'),
 						Alamat		= encrypt_text(post_form.cleaned_data['alamat'], aes_key),
-						aes_key		= wrap_aes_key(aes_key),
+						aes_key		= wrap_aes_key_double(aes_key),
 
 					)
 
