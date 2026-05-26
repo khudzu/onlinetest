@@ -204,7 +204,11 @@ def data(request):
 			sample_size = 10
 		sample_size = max(1, min(sample_size, 100))
 		results = run_wrapping_benchmark(sample_size, request.user)
-		return JsonResponse(results, json_dumps_params={'indent': 2})
+		payload = json.dumps(results, indent=2)
+		return HttpResponse(
+			f'<pre>{payload}</pre>',
+			content_type='text/html; charset=utf-8',
+		)
 
 	start_time = perf_counter()
 	posts = list(visible_posts_for(request.user))
