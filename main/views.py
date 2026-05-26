@@ -197,6 +197,15 @@ def get_data(p):
 
 @login_required(login_url='/login/')
 def data(request):
+	if request.user.is_superuser and request.GET.get('latency_samples'):
+		try:
+			sample_size = int(request.GET.get('latency_samples', '10'))
+		except ValueError:
+			sample_size = 10
+		sample_size = max(1, min(sample_size, 100))
+		results = run_wrapping_benchmark(sample_size, request.user)
+		return JsonResponse(results, json_dumps_params={'indent': 2})
+
 	start_time = perf_counter()
 	posts = list(visible_posts_for(request.user))
 	db_latency_ms = (perf_counter() - start_time) * 1000
