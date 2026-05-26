@@ -1,10 +1,12 @@
 from django.conf import settings
 from django.http import FileResponse, Http404
 from django.http import HttpResponse
+from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.http import HttpResponseRedirect
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import user_passes_test
 from main.functions.functions import handle_uploaded_file
 from main.crypto.aes_reed_muller import (
 	decrypt_image_bytes,
@@ -22,6 +24,7 @@ from main.crypto.aes_reed_muller import (
 # Create your views here.
 
 from .forms import DecryptionKeyForm, PostForm, LoginForm
+from .benchmark import run_wrapping_benchmark
 from .models import PostModel
 from sympy import *
 import cv2
@@ -271,6 +274,18 @@ def home(request):
 		'show_ciphertext':True,
 	}
 	return render(request,'main/home.html',context)
+
+
+@login_required(login_url='/login/')
+@user_passes_test(lambda user: user.is_superuser, login_url='/login/')
+def benchmark(request):
+	try:
+		sample_size = int(request.GET.get('samples', '10'))
+	except ValueError:
+		sample_size = 10
+	sample_size = max(1, min(sample_size, 100))
+	results = run_wrapping_benchmark(sample_size, request.user)
+	return JsonResponse(results, json_dumps_params={'indent': 2})
 
 @login_required(login_url='/login/')
 def create(request):
