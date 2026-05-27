@@ -25,6 +25,7 @@ from main.crypto.aes_reed_muller import (
 
 from .forms import DecryptionKeyForm, PostForm, LoginForm
 from .benchmark import run_wrapping_benchmark
+from .image_benchmark import run_image_encryption_benchmark
 from .models import PostModel
 from sympy import *
 import cv2
@@ -298,6 +299,17 @@ def benchmark(request):
 		sample_size = 10
 	sample_size = max(1, min(sample_size, 100))
 	results = run_wrapping_benchmark(sample_size, request.user)
+	return JsonResponse(results, json_dumps_params={'indent': 2})
+
+
+@login_required(login_url='/login/')
+@user_passes_test(lambda user: user.is_superuser, login_url='/login/')
+def image_benchmark(request):
+	try:
+		runs = int(request.GET.get('runs', '3'))
+	except ValueError:
+		runs = 3
+	results = run_image_encryption_benchmark(runs)
 	return JsonResponse(results, json_dumps_params={'indent': 2})
 
 @login_required(login_url='/login/')
