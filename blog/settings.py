@@ -64,9 +64,7 @@ PRODUCTION = RAILWAY_ENVIRONMENT_NAME is not None or DATABASE_URL is not None
 DEBUG = env_bool('DEBUG', default=not PRODUCTION)
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS')
-ALLOWED_HOSTS += [
-    "web-production-cb7fc.up.railway.app",
-]
+ALLOWED_HOSTS=www.jrce.web.id,jrce.web.id,web-production-cb7fc.up.railway.app
 
 if RAILWAY_PUBLIC_DOMAIN:
     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
