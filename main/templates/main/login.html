@@ -4,7 +4,11 @@
 {% block body_class %}login-page{% endblock body_class %}
 {% block page %}
   <main class="login-card">
-    <div class="national-mark" aria-hidden="true">✦</div>
+    <img
+      class="national-mark"
+      src="https://upload.wikimedia.org/wikipedia/commons/9/90/National_emblem_of_Indonesia_Garuda_Pancasila.svg"
+      alt="Garuda Pancasila"
+    >
     <div class="national-name">REPUBLIK INDONESIA</div>
     <form class="login-form" method="POST">
       {% csrf_token %}
