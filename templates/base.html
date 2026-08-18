@@ -1,50 +1,61 @@
+{% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-	<title>
-	{% block title %}
-
-	{% endblock title %}
-	</title>
-	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Administrasi Kependudukan{% endblock title %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
-<body>
-	<nav class="navbar navbar-expand-md navbar-light bg-light">
-	  <a class="navbar-brand" href="#">Database Kependudukan</a>
-	  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
-	    <span class="navbar-toggler-icon"></span>
-	  </button>
-	  <div class="collapse navbar-collapse" id="navbarNavDropdown">
-	    <ul class="navbar-nav">
-	      <li class="nav-item active">
-	        <a class="nav-link" href="/">Home</a>
-	      </li>
-	      <li class="nav-item dropdown">
-	        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-	          User
-	        </a>
-	        <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+<body class="{% block body_class %}{% endblock body_class %}">
+  {% block page %}
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">✦</div>
+        <div>
+          <div class="brand-kicker">KEMENTERIAN DALAM NEGERI</div>
+          <div class="brand-name">REPUBLIK INDONESIA</div>
+        </div>
+        <button class="sidebar-toggle" type="button" aria-label="Buka menu">☰</button>
+      </div>
 
-	          <a class="dropdown-item" href="{% url 'main:create' %}">Registrasi</a>
-			  <a class="dropdown-item" href="{% url 'main:login' %}">Login</a>
-			  <a class="dropdown-item" href="{% url 'main:logout' %}">Logout</a>
-	        </div>
-	      </li>
-	      <li class="nav-item active">
-	        <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
-	      </li>
-	    </ul>
-	  </div>
-	</nav>
-	<div class="container">
-		{% block contents %}
+      <nav class="side-nav" aria-label="Navigasi utama">
+        <a class="side-link {% if request.path == '/' or request.path == '/data/' %}is-active{% endif %}" href="{% url 'main:data' %}">
+          <span class="side-icon">⌂</span><span>Halaman Utama</span>
+        </a>
+        <a class="side-link {% if '/create/' in request.path %}is-active{% endif %}" href="{% url 'main:create' %}">
+          <span class="side-icon">♙</span><span>Pendaftaran Penduduk</span>
+        </a>
+      </nav>
 
-		{% endblock contents %}
-	</div>
+      <div class="sidebar-footer">
+        {% if request.user.is_authenticated %}
+          <span class="user-dot">{{ request.user.username|first|upper }}</span>
+          <span class="user-label">{{ request.user.username }}</span>
+          <a class="logout-link" href="{% url 'main:logout' %}" aria-label="Keluar">↪</a>
+        {% endif %}
+      </div>
+    </aside>
 
-	<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    <main class="main-panel">
+      <header class="topbar">
+        <div class="breadcrumb">Sistem Informasi <span>/</span> Administrasi Kependudukan</div>
+        <div class="topbar-actions">
+          {% if request.user.is_authenticated %}
+            <span class="status-pill"><span class="status-dot"></span> Aman</span>
+            <span class="topbar-user">{{ request.user.username }}</span>
+          {% endif %}
+        </div>
+      </header>
+      <section class="content-area">
+        {% block contents %}{% endblock contents %}
+      </section>
+    </main>
+  </div>
+  {% endblock page %}
 </body>
 </html>

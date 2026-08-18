@@ -1,13 +1,26 @@
 {% extends "base.html" %}
 {% load static %}
+{% block title %}Pendaftaran Penduduk - Administrasi Kependudukan{% endblock title %}
 {% block contents %}
-	<h1>{{page_title}}</h1>
-
-	<form method = "POST" enctype="multipart/form-data">
-		{% csrf_token %}
-		<table>
-			{{post_form.as_table}}
-		</table>
-		<button type="Submit">Kirim</button>
-	</form>
+  <div class="page-heading">
+    <div>
+      <h1>Pendaftaran Penduduk</h1>
+      <p>Masukkan data penduduk untuk disimpan secara aman.</p>
+    </div>
+  </div>
+  <div class="section-bar"><span class="bar-icon">♙</span> Formulir Data Penduduk</div>
+  <div class="section-body form-card">
+    <form class="styled-form" method="POST" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ post_form.non_field_errors }}
+      {% for field in post_form %}
+        <p>
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.errors %}<span class="error-message" style="display:block;margin-top:7px">{{ field.errors|striptags }}</span>{% endif %}
+        </p>
+      {% endfor %}
+      <button class="submit-button" type="submit">Kirim Data</button>
+    </form>
+  </div>
 {% endblock contents %}

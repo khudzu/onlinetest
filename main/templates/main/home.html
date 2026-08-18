@@ -1,37 +1,43 @@
 {% extends "base.html" %}
 {% load static %}
-
+{% block title %}Halaman Utama - Administrasi Kependudukan{% endblock title %}
 {% block contents %}
-	<h1>{{page_title}}</h1>
-	<p>Database latency: {{db_latency_ms|floatformat:2}} ms</p>
-	{% if decryption_form %}
-		<form method="POST">
-			{% csrf_token %}
-			<table>
-				{{decryption_form.as_table}}
-			</table>
-			<button type="Submit">Dekripsi</button>
-		</form>
-	{% endif %}
-	{% if decryption_error %}
-		<p>{{decryption_error}}</p>
-	{% endif %}
-	<br>
+  <div class="page-heading">
+    <div>
+      <h1>Halaman Utama</h1>
+      <p>Data penduduk tersimpan dengan perlindungan enkripsi.</p>
+    </div>
+    <span class="latency">Latensi database: {{ db_latency_ms|floatformat:2 }} ms</span>
+  </div>
 
-	<br>
-	{% for post in posts  %}
-		<img src="{{post.image}}" width="100px"><br>
-		{% if show_ciphertext %}
-			<p>Nama ciphertext:</p>
-			<pre style="white-space: pre-wrap; overflow-wrap: anywhere;">{{post.Nama}}</pre>
-			<p>Alamat ciphertext:</p>
-			<pre style="white-space: pre-wrap; overflow-wrap: anywhere;">{{post.Alamat}}</pre>
-			<p>NIK ciphertext:</p>
-			<pre style="white-space: pre-wrap; overflow-wrap: anywhere;">{{post.NIK}}</pre>
-		{% else %}
-			Nama:<b>{{post.Nama}}</b>
-			<p>Alamat:{{post.Alamat}}</p>
-			<p>NIK:{{post.NIK}}</p>
-		{% endif %}
-	{% endfor %}
+  {% if decryption_form %}
+    <div class="section-bar"><span class="bar-icon">⌕</span> Akses Data Terlindungi</div>
+    <div class="section-body">
+      <form class="styled-form" method="POST">
+        {% csrf_token %}
+        <p>
+          <label for="id_decryption_key">Kunci dekripsi</label>
+          {{ decryption_form.decryption_key }}
+        </p>
+        <button class="submit-button" type="submit">Dekripsi Data</button>
+      </form>
+      {% if decryption_error %}<p class="error-message" style="margin-top:16px">{{ decryption_error }}</p>{% endif %}
+    </div>
+  {% endif %}
+
+  {% if posts %}
+    {% for post in posts %}
+      <div class="section-bar"><span class="bar-icon">▦</span> Data Penduduk</div>
+      <div class="section-body">
+        <div class="record-grid">
+          <div class="record"><span class="record-label">Nama Lengkap</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.Nama }}</div></div>
+          <div class="record"><span class="record-label">NIK</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.NIK }}</div></div>
+          <div class="record"><span class="record-label">Alamat</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.Alamat }}</div></div>
+          <div class="record"><span class="record-label">Cipher Image</span><img class="cipher-image" src="{{ post.image }}" alt="Cipher image"></div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">Belum ada data penduduk. Silakan buka menu <strong>Pendaftaran Penduduk</strong>.</div>
+  {% endif %}
 {% endblock contents %}

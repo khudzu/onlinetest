@@ -1,13 +1,21 @@
 {% extends "base.html" %}
 {% load static %}
-{% block contents %}
-	<h1>{{page_title}}</h1>
-
-	<form method = "POST">
-		{% csrf_token %}
-		<table>
-			{{login_form.as_table}}
-		</table>
-		<button type="Submit">Kirim</button>
-	</form>
-{% endblock contents %}
+{% block title %}Login - Administrasi Kependudukan{% endblock title %}
+{% block body_class %}login-page{% endblock body_class %}
+{% block page %}
+  <main class="login-card">
+    <div class="national-mark" aria-hidden="true">✦</div>
+    <div class="national-name">REPUBLIK INDONESIA</div>
+    <form class="login-form" method="POST">
+      {% csrf_token %}
+      {% if login_form.non_field_errors %}
+        <div class="error-message">NIK atau password tidak sesuai.</div>
+      {% endif %}
+      <input type="text" name="nama" maxlength="20" placeholder="NIK" autocomplete="username" required>
+      <input type="password" name="password" maxlength="20" placeholder="Password" autocomplete="current-password" required>
+      <h1 class="login-title">Sistem Informasi<br>Administrasi Kependudukan</h1>
+      <button class="login-button" type="submit">Masuk</button>
+    </form>
+  </main>
+  <div class="login-footer">Masuk Dengan Aplikasi <strong>IKD</strong></div>
+{% endblock page %}
