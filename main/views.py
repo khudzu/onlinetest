@@ -40,6 +40,13 @@ from uuid import uuid4
 STATIC_IMAGE_DIR = Path(__file__).resolve().parent.parent / 'static' / 'img'
 ENCRYPTED_IMAGE_DIR = settings.MEDIA_ROOT / 'encrypted_images'
 
+ENCRYPTED_DATA_FIELDS = (
+	'Nama', 'NIK', 'no_kk', 'tempat_lahir', 'tanggal_lahir',
+	'jenis_kelamin', 'nama_ayah', 'nik_ayah', 'nama_ibu', 'nik_ibu',
+	'agama', 'pendidikan', 'jenis_pekerjaan', 'status_perkawinan',
+	'status_hubungan_keluarga', 'kewarganegaraan', 'no_paspor', 'no_kitap', 'Alamat',
+)
+
 
 def get_image_url(image_name):
 	filename = Path(str(image_name)).name
@@ -65,6 +72,18 @@ def find_stored_image(filename):
 			return image_path
 
 	return None
+
+
+def decrypt_post_fields(post, aes_key):
+	for field_name in ENCRYPTED_DATA_FIELDS:
+		value = getattr(post, field_name, '')
+		if value:
+			setattr(post, field_name, decrypt_text(value, aes_key))
+
+
+def mark_post_fields(post, message):
+	for field_name in ENCRYPTED_DATA_FIELDS:
+		setattr(post, field_name, message)
 
 
 def visible_posts_for(user):
@@ -230,31 +249,19 @@ def data(request):
 		if post.aes_key and post.key_salt and decryption_key:
 			try:
 				aes_key = unwrap_aes_key(post.aes_key, decryption_key, post.key_salt)
-				post.Nama=decrypt_text(post.Nama, aes_key)
-				post.Password=decrypt_text(post.Password, aes_key)
-				post.Alamat=decrypt_text(post.Alamat, aes_key)
-				post.NIK=decrypt_text(post.NIK, aes_key)
+				decrypt_post_fields(post, aes_key)
 			except Exception:
 				decryption_error = 'Kunci dekripsi salah untuk sebagian data.'
-				post.Nama='[kunci dekripsi salah]'
-				post.Alamat='[kunci dekripsi salah]'
-				post.NIK='[kunci dekripsi salah]'
+				mark_post_fields(post, '[kunci dekripsi salah]')
 		elif post.aes_key and not post.key_salt:
 			try:
 				aes_key = unwrap_aes_key(post.aes_key)
-				post.Nama=decrypt_text(post.Nama, aes_key)
-				post.Password=decrypt_text(post.Password, aes_key)
-				post.Alamat=decrypt_text(post.Alamat, aes_key)
-				post.NIK=decrypt_text(post.NIK, aes_key)
+				decrypt_post_fields(post, aes_key)
 			except Exception:
 				decryption_error = 'Sebagian data lama tidak bisa didekripsi.'
-				post.Nama='[gagal dekripsi]'
-				post.Alamat='[gagal dekripsi]'
-				post.NIK='[gagal dekripsi]'
+				mark_post_fields(post, '[gagal dekripsi]')
 		elif post.aes_key:
-			post.Nama='[masukkan kunci dekripsi]'
-			post.Alamat='[masukkan kunci dekripsi]'
-			post.NIK='[masukkan kunci dekripsi]'
+			mark_post_fields(post, '[masukkan kunci dekripsi]')
 		else:
 			post.Nama=get_data(post.Nama)
 			post.Alamat=get_data(post.Alamat)
@@ -280,6 +287,8 @@ def home(request):
 		post.Nama=get_payload_ciphertext_text(post.Nama)
 		post.Alamat=get_payload_ciphertext_text(post.Alamat)
 		post.NIK=get_payload_ciphertext_text(post.NIK)
+		for field_name in ('no_kk', 'tempat_lahir', 'tanggal_lahir', 'jenis_kelamin', 'nama_ayah', 'nik_ayah', 'nama_ibu', 'nik_ibu', 'agama', 'pendidikan', 'jenis_pekerjaan', 'status_perkawinan', 'status_hubungan_keluarga', 'kewarganegaraan', 'no_paspor', 'no_kitap'):
+			setattr(post, field_name, get_payload_ciphertext_text(getattr(post, field_name, '')))
 		post.image_ciphertext=get_payload_ciphertext_text(post.image_ciphertext)
 	context = {
 		'page_title':'Data anda akan tersimpan dengan aman',
@@ -337,8 +346,24 @@ def create(request):
 				PostModel.objects.create(
 						owner		= request.user,
 						Nama 		= encrypt_text(post_form.cleaned_data['nama'], aes_key),
-						Password	= encrypt_text(post_form.cleaned_data['password'], aes_key),
+						Password	= '',
 						NIK		= encrypt_text(post_form.cleaned_data['nik'], aes_key),
+						no_kk		= encrypt_text(post_form.cleaned_data['no_kk'], aes_key),
+						tempat_lahir = encrypt_text(post_form.cleaned_data['tempat_lahir'], aes_key),
+						tanggal_lahir = encrypt_text(post_form.cleaned_data['tanggal_lahir'].isoformat(), aes_key),
+						jenis_kelamin = encrypt_text(post_form.cleaned_data['jenis_kelamin'], aes_key),
+						nama_ayah	= encrypt_text(post_form.cleaned_data['nama_ayah'], aes_key),
+						nik_ayah	= encrypt_text(post_form.cleaned_data['nik_ayah'], aes_key),
+						nama_ibu	= encrypt_text(post_form.cleaned_data['nama_ibu'], aes_key),
+						nik_ibu		= encrypt_text(post_form.cleaned_data['nik_ibu'], aes_key),
+						agama		= encrypt_text(post_form.cleaned_data['agama'], aes_key),
+						pendidikan	= encrypt_text(post_form.cleaned_data['pendidikan'], aes_key),
+						jenis_pekerjaan = encrypt_text(post_form.cleaned_data['jenis_pekerjaan'], aes_key),
+						status_perkawinan = encrypt_text(post_form.cleaned_data['status_perkawinan'], aes_key),
+						status_hubungan_keluarga = encrypt_text(post_form.cleaned_data['status_hubungan_keluarga'], aes_key),
+						kewarganegaraan = encrypt_text(post_form.cleaned_data['kewarganegaraan'], aes_key),
+						no_paspor	= encrypt_text(post_form.cleaned_data['no_paspor'], aes_key),
+						no_kitap	= encrypt_text(post_form.cleaned_data['no_kitap'], aes_key),
 						image 		= secured_image_name,
 						image_ciphertext = encrypted_image.decode('utf-8'),
 						Alamat		= encrypt_text(post_form.cleaned_data['alamat'], aes_key),
@@ -445,14 +470,10 @@ def login(request):
 		password_login = request.POST['password']
 
 		user = authenticate(request, username=username_login, password=password_login)
-		print(user)
 		if user is not None:
 			auth_login(request, user)
 			return redirect('/data')
 		else:
-			print(username_login)
-			print(password_login)
-			print('Username atau password anda salah, silahkan masukkan dengan benar!')
 			return redirect('/login')
 	return render(request, 'main/login.html', context)
 

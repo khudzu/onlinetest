@@ -32,6 +32,21 @@
         <div class="record-grid">
           <div class="record"><span class="record-label">Nama Lengkap</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.Nama }}</div></div>
           <div class="record"><span class="record-label">NIK</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.NIK }}</div></div>
+          <div class="record"><span class="record-label">No. KK</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.no_kk }}</div></div>
+          <div class="record"><span class="record-label">Tempat, Tanggal Lahir</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.tempat_lahir }}, {{ post.tanggal_lahir }}</div></div>
+          <div class="record"><span class="record-label">Jenis Kelamin</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.jenis_kelamin }}</div></div>
+          <div class="record"><span class="record-label">Nama Lengkap Ayah</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.nama_ayah }}</div></div>
+          <div class="record"><span class="record-label">NIK Ayah</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.nik_ayah }}</div></div>
+          <div class="record"><span class="record-label">Nama Lengkap Ibu</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.nama_ibu }}</div></div>
+          <div class="record"><span class="record-label">NIK Ibu</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.nik_ibu }}</div></div>
+          <div class="record"><span class="record-label">Agama</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.agama }}</div></div>
+          <div class="record"><span class="record-label">Pendidikan</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.pendidikan }}</div></div>
+          <div class="record"><span class="record-label">Jenis Pekerjaan</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.jenis_pekerjaan }}</div></div>
+          <div class="record"><span class="record-label">Status Perkawinan</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.status_perkawinan }}</div></div>
+          <div class="record"><span class="record-label">Status Hubungan dalam Keluarga</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.status_hubungan_keluarga }}</div></div>
+          <div class="record"><span class="record-label">Kewarganegaraan</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.kewarganegaraan }}</div></div>
+          <div class="record"><span class="record-label">No. Paspor</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.no_paspor }}</div></div>
+          <div class="record"><span class="record-label">No. KITAP</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.no_kitap }}</div></div>
           <div class="record"><span class="record-label">Alamat</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.Alamat }}</div></div>
           <div class="record"><span class="record-label">Cipher Image</span><img class="cipher-image" src="{{ post.image }}" alt="Cipher image"></div>
         </div>
