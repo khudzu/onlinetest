@@ -7,6 +7,8 @@ from django.http import HttpResponseRedirect
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import user_passes_test
+from django.urls import reverse
+from django.utils import timezone
 from main.functions.functions import handle_uploaded_file
 from main.crypto.aes_reed_muller import (
 	decrypt_image_bytes,
@@ -26,6 +28,13 @@ from main.crypto.aes_reed_muller import (
 from .forms import DecryptionKeyForm, PostForm, LoginForm
 from .benchmark import run_wrapping_benchmark
 from .image_benchmark import run_image_encryption_benchmark
+from .family_cards import (
+	family_reference,
+	public_key_fingerprint,
+	qr_code_data_uri,
+	sign_family_card,
+	verify_family_card_token,
+)
 from .models import PostModel
 from sympy import *
 import cv2
@@ -34,7 +43,7 @@ import numpy as np
 from pathlib import Path
 from io import BytesIO
 from time import perf_counter
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from uuid import uuid4
 
 STATIC_IMAGE_DIR = Path(__file__).resolve().parent.parent / 'static' / 'img'
@@ -96,6 +105,72 @@ def visible_posts_for(user):
 
 def user_can_access_post(user, post):
 	return user.is_superuser or post.owner_id == user.id
+
+
+FAMILY_RELATION_ORDER = {
+	'Kepala Keluarga': 0,
+	'Suami': 1,
+	'Istri': 2,
+	'Anak': 3,
+	'Orang Tua': 4,
+	'Lainnya': 5,
+}
+
+
+def decrypted_family_groups(request):
+	posts = list(visible_posts_for(request.user).select_related('owner').order_by('published', 'id'))
+	decryption_key = request.session.get('decryption_key')
+	groups = {}
+	skipped_records = 0
+
+	for post in posts:
+		try:
+			if post.aes_key:
+				if post.key_salt and not decryption_key:
+					skipped_records += 1
+					continue
+				aes_key = unwrap_aes_key(
+					post.aes_key,
+					decryption_key if post.key_salt else None,
+					post.key_salt or None,
+				)
+				decrypt_post_fields(post, aes_key)
+			else:
+				skipped_records += 1
+				continue
+		except Exception:
+			skipped_records += 1
+			continue
+
+		no_kk = str(post.no_kk or '').strip()
+		if not no_kk:
+			skipped_records += 1
+			continue
+		groups.setdefault(no_kk, []).append(post)
+
+	families = []
+	for no_kk, members in groups.items():
+		members.sort(
+			key=lambda member: (
+				FAMILY_RELATION_ORDER.get(member.status_hubungan_keluarga, 99),
+				member.Nama,
+			)
+		)
+		head = next(
+			(member for member in members if member.status_hubungan_keluarga == 'Kepala Keluarga'),
+			members[0],
+		)
+		families.append(
+			{
+				'address': head.Alamat,
+				'head': head,
+				'members': members,
+				'no_kk': no_kk,
+				'reference': family_reference(no_kk),
+			}
+		)
+	families.sort(key=lambda family: (family['head'].Nama, family['no_kk']))
+	return families, skipped_records
 
 
 def ciphertext_preview_png(encrypted_payload):
@@ -297,6 +372,59 @@ def home(request):
 		'show_ciphertext':True,
 	}
 	return render(request,'main/home.html',context)
+
+
+@login_required(login_url='/login/')
+def family_cards(request):
+	families, skipped_records = decrypted_family_groups(request)
+	context = {
+		'families': families,
+		'page_title': 'Cetak Kartu Keluarga',
+		'skipped_records': skipped_records,
+	}
+	return render(request, 'main/family_cards.html', context)
+
+
+@login_required(login_url='/login/')
+def print_family_card(request, family_ref):
+	families, _ = decrypted_family_groups(request)
+	family = next(
+		(candidate for candidate in families if candidate['reference'] == family_ref),
+		None,
+	)
+	if family is None:
+		raise Http404('Kartu keluarga tidak ditemukan.')
+
+	signed = sign_family_card(family['no_kk'], family['members'])
+	verification_url = request.build_absolute_uri(
+		f"{reverse('main:verify_family_card')}?{urlencode({'token': signed['token']})}"
+	)
+	context = {
+		'family': family,
+		'issued_date': timezone.localdate(),
+		'qr_code_data_uri': qr_code_data_uri(verification_url),
+		'signature': signed,
+		'verification_url': verification_url,
+	}
+	return render(request, 'main/print_family_card.html', context)
+
+
+def verify_family_card(request):
+	token = request.GET.get('token', '')
+	try:
+		payload = verify_family_card_token(token)
+		valid = True
+		status = 200
+	except ValueError:
+		payload = None
+		valid = False
+		status = 400
+	context = {
+		'fingerprint': public_key_fingerprint(),
+		'payload': payload,
+		'valid': valid,
+	}
+	return render(request, 'main/verify_family_card.html', context, status=status)
 
 
 @login_required(login_url='/login/')

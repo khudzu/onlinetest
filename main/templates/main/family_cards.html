@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Cetak Kartu Keluarga - Administrasi Kependudukan{% endblock title %}
+{% block contents %}
+  <div class="page-heading">
+    <div>
+      <h1>Cetak Kartu Keluarga</h1>
+      <p>Pilih keluarga untuk membuka dokumen bertanda tangan digital.</p>
+    </div>
+  </div>
+
+  {% if skipped_records %}
+    <div class="error-message family-card-alert">
+      {{ skipped_records }} data belum dapat dimuat. Buka Halaman Utama dan masukkan kunci dekripsi bila diperlukan.
+    </div>
+  {% endif %}
+
+  <div class="section-bar"><span class="bar-icon">▤</span> Daftar Kartu Keluarga</div>
+  <div class="section-body family-list-wrap">
+    {% if families %}
+      <div class="table-scroll">
+        <table class="family-list-table">
+          <thead>
+            <tr>
+              <th>No. KK</th>
+              <th>Kepala Keluarga</th>
+              <th>Alamat</th>
+              <th>Anggota</th>
+              <th><span class="sr-only">Tindakan</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for family in families %}
+              <tr>
+                <td class="number-cell">{{ family.no_kk }}</td>
+                <td>{{ family.head.Nama }}</td>
+                <td>{{ family.address|default:"-" }}</td>
+                <td>{{ family.members|length }}</td>
+                <td class="action-cell">
+                  <a class="print-link" href="{% url 'main:print_family_card' family.reference %}" target="_blank" rel="noopener">
+                    <span aria-hidden="true">⎙</span> Cetak
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">Belum ada keluarga yang dapat dicetak.</div>
+    {% endif %}
+  </div>
+{% endblock contents %}

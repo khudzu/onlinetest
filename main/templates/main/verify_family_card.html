@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Verifikasi Kartu Keluarga{% endblock title %}
+{% block body_class %}verification-page{% endblock body_class %}
+{% block page %}
+  <main class="verification-shell">
+    <section class="verification-result {% if valid %}is-valid{% else %}is-invalid{% endif %}">
+      <div class="verification-icon" aria-hidden="true">{% if valid %}✓{% else %}×{% endif %}</div>
+      {% if valid %}
+        <h1>Tanda Tangan Digital Valid</h1>
+        <p>Dokumen Kartu Keluarga telah ditandatangani menggunakan Ed25519 dan token QR tidak mengalami perubahan.</p>
+        <dl class="verification-details">
+          <div><dt>No. KK</dt><dd>************{{ payload.no_kk_last4 }}</dd></div>
+          <div><dt>Diterbitkan</dt><dd>{{ payload.issued_at }}</dd></div>
+          <div><dt>Sidik jari kunci</dt><dd>{{ fingerprint }}</dd></div>
+          <div><dt>Digest dokumen</dt><dd>{{ payload.digest }}</dd></div>
+        </dl>
+      {% else %}
+        <h1>Tanda Tangan Digital Tidak Valid</h1>
+        <p>Token QR tidak lengkap, rusak, atau telah mengalami perubahan.</p>
+        <dl class="verification-details">
+          <div><dt>Sidik jari kunci</dt><dd>{{ fingerprint }}</dd></div>
+        </dl>
+      {% endif %}
+    </section>
+  </main>
+{% endblock page %}

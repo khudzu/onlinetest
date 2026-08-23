@@ -1,0 +1,116 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: #eef2f2; color: #101414; }
+
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 12px 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #dce5e5;
+}
+.print-toolbar a { color: #18543a; text-decoration: none; font-size: 14px; font-weight: 700; }
+.print-toolbar button { padding: 10px 18px; border: 0; border-radius: 5px; color: #fff; background: #08733d; font-weight: 700; cursor: pointer; }
+
+.family-card-sheet {
+  position: relative;
+  isolation: isolate;
+  width: min(1280px, calc(100vw - 32px));
+  min-height: 805px;
+  margin: 22px auto;
+  padding: 22px 26px 18px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 12px 38px rgba(16, 40, 32, .14);
+}
+.family-card-watermark {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: 620px;
+  height: 620px;
+  transform: translate(-50%, -46%);
+  object-fit: contain;
+  opacity: .055;
+}
+.family-card-header { display: grid; grid-template-columns: 96px 1fr 96px; align-items: center; margin-bottom: 12px; }
+.family-card-emblem { width: 80px; height: 80px; object-fit: contain; }
+.family-card-title { text-align: center; }
+.family-card-title h1 { display: inline-block; margin: 0; padding: 0 12px 4px; border-bottom: 4px solid #111; font-family: Georgia, serif; font-size: 38px; letter-spacing: 1px; }
+.family-card-number { margin-top: 5px; font-size: 22px; font-weight: 700; letter-spacing: 2px; }
+
+.family-identity { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin: 10px 8px 15px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.family-identity dl { margin: 0; }
+.family-identity dl > div { display: grid; grid-template-columns: 170px 12px 1fr; gap: 5px; margin: 5px 0; }
+.family-identity dl > div::before { content: ':'; grid-column: 2; }
+.family-identity dt { grid-column: 1; }
+.family-identity dd { grid-column: 3; margin: 0; }
+
+.family-card-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
+.family-card-table + .family-card-table { margin-top: 13px; }
+.family-card-table th, .family-card-table td { padding: 5px 4px; border: 1px solid #111; text-align: center; vertical-align: middle; overflow-wrap: anywhere; }
+.family-card-table th { font-weight: 700; }
+.family-card-table td:nth-child(2) { text-align: left; }
+.primary-table th:nth-child(1) { width: 3%; }
+.primary-table th:nth-child(2) { width: 16%; }
+.primary-table th:nth-child(3) { width: 13%; }
+.primary-table th:nth-child(4) { width: 8%; }
+.primary-table th:nth-child(5) { width: 9%; }
+.primary-table th:nth-child(6) { width: 9%; }
+.primary-table th:nth-child(7) { width: 7%; }
+.primary-table th:nth-child(8) { width: 13%; }
+.primary-table th:nth-child(9) { width: 12%; }
+.secondary-table th:nth-child(1) { width: 3%; }
+.secondary-table th:nth-child(2) { width: 12%; }
+.secondary-table th:nth-child(3) { width: 15%; }
+.secondary-table th:nth-child(4) { width: 10%; }
+.secondary-table th:nth-child(5), .secondary-table th:nth-child(6) { width: 10%; }
+.secondary-table th:nth-child(7), .secondary-table th:nth-child(8) { width: 20%; }
+
+.family-card-footer { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; align-items: start; margin: 17px 18px 0; font-size: 10px; text-align: center; }
+.issue-block { text-align: left; }
+.issue-block p { margin: 6px 0; }
+.approval-block p, .digital-signature-block p { margin: 4px 0; }
+.signature-line { width: 180px; margin: 68px auto 0; padding-top: 4px; border-top: 1px solid #111; font-weight: 700; }
+.digital-signature-block { display: grid; justify-items: center; }
+.digital-signature-block a { display: inline-block; line-height: 0; }
+.digital-signature-block img { width: 134px; height: 134px; margin: 4px 0 2px; }
+.digital-signature-block strong { max-width: 220px; padding: 2px 14px; border-bottom: 1px solid #111; }
+.digital-signature-block small { display: block; margin-top: 3px; font-size: 7px; }
+
+@page { size: A4 landscape; margin: 7mm; }
+@media print {
+  html, body { background: #fff; }
+  .print-toolbar { display: none; }
+  .family-card-sheet {
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+  .family-card-watermark { width: 560px; height: 560px; }
+  .family-card-title h1 { font-size: 30px; }
+  .family-card-number { font-size: 18px; }
+  .family-card-table { font-size: 7.5px; }
+  .family-card-table th, .family-card-table td { padding: 3px; }
+  .family-card-footer { margin-top: 10px; }
+  .digital-signature-block img { width: 134px; height: 134px; }
+}
+
+@media (max-width: 900px) {
+  .family-card-sheet { width: 1180px; margin-left: 16px; }
+  body { overflow-x: auto; }
+}

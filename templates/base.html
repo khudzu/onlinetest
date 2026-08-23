@@ -34,6 +34,9 @@
         <a class="side-link {% if '/create/' in request.path %}is-active{% endif %}" href="{% url 'main:create' %}">
           <span class="side-icon">♙</span><span>Pendaftaran Penduduk</span>
         </a>
+        <a class="side-link {% if '/family-cards/' in request.path %}is-active{% endif %}" href="{% url 'main:family_cards' %}">
+          <span class="side-icon">▤</span><span>Cetak Kartu Keluarga</span>
+        </a>
       </nav>
 
       <div class="sidebar-footer">

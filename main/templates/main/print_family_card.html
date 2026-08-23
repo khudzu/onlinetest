@@ -1,0 +1,134 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kartu Keluarga {{ family.no_kk }}</title>
+  <link rel="stylesheet" href="{% static 'css/family-card.css' %}">
+</head>
+<body>
+  <div class="print-toolbar">
+    <a href="{% url 'main:family_cards' %}" aria-label="Kembali ke daftar kartu keluarga">← Kembali</a>
+    <button type="button" onclick="window.print()"><span aria-hidden="true">⎙</span> Cetak</button>
+  </div>
+
+  <main class="family-card-sheet">
+    <img
+      class="family-card-watermark"
+      src="https://upload.wikimedia.org/wikipedia/commons/9/90/National_emblem_of_Indonesia_Garuda_Pancasila.svg"
+      alt=""
+      aria-hidden="true"
+    >
+    <header class="family-card-header">
+      <img
+        class="family-card-emblem"
+        src="https://upload.wikimedia.org/wikipedia/commons/9/90/National_emblem_of_Indonesia_Garuda_Pancasila.svg"
+        alt="Garuda Pancasila"
+      >
+      <div class="family-card-title">
+        <h1>KARTU KELUARGA</h1>
+        <div class="family-card-number">No. {{ family.no_kk }}</div>
+      </div>
+      <div class="header-spacer" aria-hidden="true"></div>
+    </header>
+
+    <section class="family-identity">
+      <dl>
+        <div><dt>Nama Kepala Keluarga</dt><dd>{{ family.head.Nama }}</dd></div>
+        <div><dt>Alamat</dt><dd>{{ family.address|default:"-" }}</dd></div>
+        <div><dt>RT / RW</dt><dd>- / -</dd></div>
+        <div><dt>Desa / Kelurahan</dt><dd>-</dd></div>
+      </dl>
+      <dl>
+        <div><dt>Kecamatan</dt><dd>-</dd></div>
+        <div><dt>Kabupaten / Kota</dt><dd>-</dd></div>
+        <div><dt>Kode Pos</dt><dd>-</dd></div>
+        <div><dt>Provinsi</dt><dd>-</dd></div>
+      </dl>
+    </section>
+
+    <table class="family-card-table primary-table">
+      <thead>
+        <tr>
+          <th>No.</th>
+          <th>Nama Lengkap</th>
+          <th>NIK</th>
+          <th>Jenis Kelamin</th>
+          <th>Tempat Lahir</th>
+          <th>Tanggal Lahir</th>
+          <th>Agama</th>
+          <th>Pendidikan</th>
+          <th>Jenis Pekerjaan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for member in family.members %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ member.Nama }}</td>
+            <td>{{ member.NIK }}</td>
+            <td>{{ member.jenis_kelamin }}</td>
+            <td>{{ member.tempat_lahir }}</td>
+            <td>{{ member.tanggal_lahir }}</td>
+            <td>{{ member.agama }}</td>
+            <td>{{ member.pendidikan }}</td>
+            <td>{{ member.jenis_pekerjaan }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <table class="family-card-table secondary-table">
+      <thead>
+        <tr>
+          <th>No.</th>
+          <th>Status Perkawinan</th>
+          <th>Status Hubungan dalam Keluarga</th>
+          <th>Kewarganegaraan</th>
+          <th>No. Paspor</th>
+          <th>No. KITAP</th>
+          <th>Nama Ayah</th>
+          <th>Nama Ibu</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for member in family.members %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ member.status_perkawinan }}</td>
+            <td>{{ member.status_hubungan_keluarga }}</td>
+            <td>{{ member.kewarganegaraan }}</td>
+            <td>{{ member.no_paspor|default:"-" }}</td>
+            <td>{{ member.no_kitap|default:"-" }}</td>
+            <td>{{ member.nama_ayah }}</td>
+            <td>{{ member.nama_ibu }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <footer class="family-card-footer">
+      <div class="issue-block">
+        <p>Dikeluarkan tanggal: <strong>{{ issued_date|date:"d-m-Y" }}</strong></p>
+        <p>Untuk:</p>
+        <p>☒ Kepala Keluarga</p>
+      </div>
+      <div class="approval-block">
+        <p>MENGETAHUI</p>
+        <p>KEPALA DESA / KELURAHAN</p>
+        <div class="signature-line">-</div>
+      </div>
+      <div class="digital-signature-block">
+        <p>KEPALA KELUARGA</p>
+        <a href="{{ verification_url }}" target="_blank" rel="noopener" aria-label="Verifikasi tanda tangan digital">
+          <img src="{{ qr_code_data_uri }}" alt="QR tanda tangan digital Kartu Keluarga">
+        </a>
+        <strong>{{ family.head.Nama }}</strong>
+        <small>Ditandatangani secara elektronik - Ed25519</small>
+        <small>Kunci: {{ signature.fingerprint }}</small>
+      </div>
+    </footer>
+  </main>
+</body>
+</html>
