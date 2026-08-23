@@ -81,8 +81,7 @@ html, body { margin: 0; min-height: 100%; background: #eef2f2; color: #101414; }
 .family-card-footer { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; align-items: start; margin: 17px 18px 0; font-size: 10px; text-align: center; }
 .issue-block { text-align: left; }
 .issue-block p { margin: 6px 0; }
-.approval-block p, .digital-signature-block p { margin: 4px 0; }
-.signature-line { width: 180px; margin: 68px auto 0; padding-top: 4px; border-top: 1px solid #111; font-weight: 700; }
+.digital-signature-block p { margin: 4px 0; }
 .digital-signature-block { display: grid; justify-items: center; }
 .digital-signature-block a { display: inline-block; line-height: 0; }
 .digital-signature-block img { width: 134px; height: 134px; margin: 4px 0 2px; }

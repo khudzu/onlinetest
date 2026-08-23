@@ -45,6 +45,7 @@ from io import BytesIO
 from time import perf_counter
 from urllib.parse import quote, urlencode
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 STATIC_IMAGE_DIR = Path(__file__).resolve().parent.parent / 'static' / 'img'
 ENCRYPTED_IMAGE_DIR = settings.MEDIA_ROOT / 'encrypted_images'
@@ -54,6 +55,8 @@ ENCRYPTED_DATA_FIELDS = (
 	'jenis_kelamin', 'nama_ayah', 'nik_ayah', 'nama_ibu', 'nik_ibu',
 	'agama', 'pendidikan', 'jenis_pekerjaan', 'status_perkawinan',
 	'status_hubungan_keluarga', 'kewarganegaraan', 'no_paspor', 'no_kitap', 'Alamat',
+	'rt', 'rw', 'desa_kelurahan', 'kecamatan', 'kabupaten_kota', 'kode_pos',
+	'provinsi', 'nama_kepala_desa',
 )
 
 
@@ -163,6 +166,14 @@ def decrypted_family_groups(request):
 		families.append(
 			{
 				'address': head.Alamat,
+				'rt': head.rt,
+				'rw': head.rw,
+				'desa_kelurahan': head.desa_kelurahan,
+				'kecamatan': head.kecamatan,
+				'kabupaten_kota': head.kabupaten_kota,
+				'kode_pos': head.kode_pos,
+				'provinsi': head.provinsi,
+				'nama_kepala_desa': head.nama_kepala_desa,
 				'head': head,
 				'members': members,
 				'no_kk': no_kk,
@@ -395,16 +406,34 @@ def print_family_card(request, family_ref):
 	if family is None:
 		raise Http404('Kartu keluarga tidak ditemukan.')
 
-	signed = sign_family_card(family['no_kk'], family['members'])
-	verification_url = request.build_absolute_uri(
-		f"{reverse('main:verify_family_card')}?{urlencode({'token': signed['token']})}"
+	family_signature = sign_family_card(
+		family['no_kk'],
+		family['members'],
+		signer_role='family_head',
+	)
+	village_signature = sign_family_card(
+		family['no_kk'],
+		family['members'],
+		signer_role='village_head',
+	)
+	family_verification_url = request.build_absolute_uri(
+		f"{reverse('main:verify_family_card')}?{urlencode({'token': family_signature['token']})}"
+	)
+	village_verification_url = request.build_absolute_uri(
+		f"{reverse('main:verify_family_card')}?{urlencode({'token': village_signature['token']})}"
 	)
 	context = {
 		'family': family,
-		'issued_date': timezone.localdate(),
-		'qr_code_data_uri': qr_code_data_uri(verification_url),
-		'signature': signed,
-		'verification_url': verification_url,
+		'family_qr_code_data_uri': qr_code_data_uri(family_verification_url),
+		'family_signature': family_signature,
+		'family_verification_url': family_verification_url,
+		'issued_date': timezone.localtime(
+			timezone.now(),
+			ZoneInfo('Asia/Jakarta'),
+		).date(),
+		'village_qr_code_data_uri': qr_code_data_uri(village_verification_url),
+		'village_signature': village_signature,
+		'village_verification_url': village_verification_url,
 	}
 	return render(request, 'main/print_family_card.html', context)
 
@@ -420,7 +449,7 @@ def verify_family_card(request):
 		valid = False
 		status = 400
 	context = {
-		'fingerprint': public_key_fingerprint(),
+		'fingerprint': public_key_fingerprint(payload['signer_role']) if payload else '',
 		'payload': payload,
 		'valid': valid,
 	}
@@ -492,6 +521,14 @@ def create(request):
 						kewarganegaraan = encrypt_text(post_form.cleaned_data['kewarganegaraan'], aes_key),
 						no_paspor	= encrypt_text(post_form.cleaned_data['no_paspor'], aes_key),
 						no_kitap	= encrypt_text(post_form.cleaned_data['no_kitap'], aes_key),
+						rt		= encrypt_text(post_form.cleaned_data['rt'], aes_key),
+						rw		= encrypt_text(post_form.cleaned_data['rw'], aes_key),
+						desa_kelurahan = encrypt_text(post_form.cleaned_data['desa_kelurahan'], aes_key),
+						kecamatan	= encrypt_text(post_form.cleaned_data['kecamatan'], aes_key),
+						kabupaten_kota = encrypt_text(post_form.cleaned_data['kabupaten_kota'], aes_key),
+						kode_pos	= encrypt_text(post_form.cleaned_data['kode_pos'], aes_key),
+						provinsi	= encrypt_text(post_form.cleaned_data['provinsi'], aes_key),
+						nama_kepala_desa = encrypt_text(post_form.cleaned_data['nama_kepala_desa'], aes_key),
 						image 		= secured_image_name,
 						image_ciphertext = encrypted_image.decode('utf-8'),
 						Alamat		= encrypt_text(post_form.cleaned_data['alamat'], aes_key),

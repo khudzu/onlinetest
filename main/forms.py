@@ -42,6 +42,14 @@ class PostForm(forms.Form):
 	no_paspor = forms.CharField(label='No. Paspor', max_length=50, required=False)
 	no_kitap = forms.CharField(label='No. KITAP', max_length=50, required=False)
 	alamat = forms.CharField(label='Alamat', widget=forms.Textarea)
+	rt = forms.CharField(label='RT', max_length=3)
+	rw = forms.CharField(label='RW', max_length=3)
+	desa_kelurahan = forms.CharField(label='Desa/Kelurahan', max_length=100)
+	kecamatan = forms.CharField(label='Kecamatan', max_length=100)
+	kabupaten_kota = forms.CharField(label='Kabupaten/Kota', max_length=100)
+	kode_pos = forms.CharField(label='Kode Pos', max_length=5)
+	provinsi = forms.CharField(label='Provinsi', max_length=100)
+	nama_kepala_desa = forms.CharField(label='Nama Kepala Desa/Lurah', max_length=100)
 	image = forms.ImageField(label='Foto', required=True)
 
 

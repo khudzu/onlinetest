@@ -48,6 +48,13 @@
           <div class="record"><span class="record-label">No. Paspor</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.no_paspor }}</div></div>
           <div class="record"><span class="record-label">No. KITAP</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.no_kitap }}</div></div>
           <div class="record"><span class="record-label">Alamat</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.Alamat }}</div></div>
+          <div class="record"><span class="record-label">RT/RW</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.rt }}/{{ post.rw }}</div></div>
+          <div class="record"><span class="record-label">Desa/Kelurahan</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.desa_kelurahan }}</div></div>
+          <div class="record"><span class="record-label">Kecamatan</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.kecamatan }}</div></div>
+          <div class="record"><span class="record-label">Kabupaten/Kota</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.kabupaten_kota }}</div></div>
+          <div class="record"><span class="record-label">Kode Pos</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.kode_pos }}</div></div>
+          <div class="record"><span class="record-label">Provinsi</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.provinsi }}</div></div>
+          <div class="record"><span class="record-label">Kepala Desa/Lurah</span><div class="record-value{% if show_ciphertext %} cipher{% endif %}">{{ post.nama_kepala_desa }}</div></div>
           <div class="record"><span class="record-label">Cipher Image</span><img class="cipher-image" src="{{ post.image }}" alt="Cipher image"></div>
         </div>
       </div>

@@ -37,14 +37,14 @@
       <dl>
         <div><dt>Nama Kepala Keluarga</dt><dd>{{ family.head.Nama }}</dd></div>
         <div><dt>Alamat</dt><dd>{{ family.address|default:"-" }}</dd></div>
-        <div><dt>RT / RW</dt><dd>- / -</dd></div>
-        <div><dt>Desa / Kelurahan</dt><dd>-</dd></div>
+        <div><dt>RT / RW</dt><dd>{{ family.rt|default:"-" }} / {{ family.rw|default:"-" }}</dd></div>
+        <div><dt>Desa / Kelurahan</dt><dd>{{ family.desa_kelurahan|default:"-" }}</dd></div>
       </dl>
       <dl>
-        <div><dt>Kecamatan</dt><dd>-</dd></div>
-        <div><dt>Kabupaten / Kota</dt><dd>-</dd></div>
-        <div><dt>Kode Pos</dt><dd>-</dd></div>
-        <div><dt>Provinsi</dt><dd>-</dd></div>
+        <div><dt>Kecamatan</dt><dd>{{ family.kecamatan|default:"-" }}</dd></div>
+        <div><dt>Kabupaten / Kota</dt><dd>{{ family.kabupaten_kota|default:"-" }}</dd></div>
+        <div><dt>Kode Pos</dt><dd>{{ family.kode_pos|default:"-" }}</dd></div>
+        <div><dt>Provinsi</dt><dd>{{ family.provinsi|default:"-" }}</dd></div>
       </dl>
     </section>
 
@@ -114,19 +114,24 @@
         <p>Untuk:</p>
         <p>☒ Kepala Keluarga</p>
       </div>
-      <div class="approval-block">
+      <div class="digital-signature-block">
         <p>MENGETAHUI</p>
         <p>KEPALA DESA / KELURAHAN</p>
-        <div class="signature-line">-</div>
+        <a href="{{ village_verification_url }}" target="_blank" rel="noopener" aria-label="Verifikasi tanda tangan digital kepala desa atau lurah">
+          <img src="{{ village_qr_code_data_uri }}" alt="QR tanda tangan digital kepala desa atau lurah">
+        </a>
+        <strong>{{ family.nama_kepala_desa|default:"Kepala Desa/Lurah" }}</strong>
+        <small>Ditandatangani secara elektronik - Ed25519</small>
+        <small>Kunci: {{ village_signature.fingerprint }}</small>
       </div>
       <div class="digital-signature-block">
         <p>KEPALA KELUARGA</p>
-        <a href="{{ verification_url }}" target="_blank" rel="noopener" aria-label="Verifikasi tanda tangan digital">
-          <img src="{{ qr_code_data_uri }}" alt="QR tanda tangan digital Kartu Keluarga">
+        <a href="{{ family_verification_url }}" target="_blank" rel="noopener" aria-label="Verifikasi tanda tangan digital kepala keluarga">
+          <img src="{{ family_qr_code_data_uri }}" alt="QR tanda tangan digital kepala keluarga">
         </a>
         <strong>{{ family.head.Nama }}</strong>
         <small>Ditandatangani secara elektronik - Ed25519</small>
-        <small>Kunci: {{ signature.fingerprint }}</small>
+        <small>Kunci: {{ family_signature.fingerprint }}</small>
       </div>
     </footer>
   </main>

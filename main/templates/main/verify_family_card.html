@@ -9,6 +9,7 @@
         <h1>Tanda Tangan Digital Valid</h1>
         <p>Dokumen Kartu Keluarga telah ditandatangani menggunakan Ed25519 dan token QR tidak mengalami perubahan.</p>
         <dl class="verification-details">
+          <div><dt>Penanda Tangan</dt><dd>{{ payload.signer_label }}</dd></div>
           <div><dt>No. KK</dt><dd>************{{ payload.no_kk_last4 }}</dd></div>
           <div><dt>Diterbitkan</dt><dd>{{ payload.issued_at }}</dd></div>
           <div><dt>Sidik jari kunci</dt><dd>{{ fingerprint }}</dd></div>
@@ -17,9 +18,6 @@
       {% else %}
         <h1>Tanda Tangan Digital Tidak Valid</h1>
         <p>Token QR tidak lengkap, rusak, atau telah mengalami perubahan.</p>
-        <dl class="verification-details">
-          <div><dt>Sidik jari kunci</dt><dd>{{ fingerprint }}</dd></div>
-        </dl>
       {% endif %}
     </section>
   </main>

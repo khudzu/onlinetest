@@ -19,8 +19,20 @@ from django.utils import timezone
 
 
 SIGNATURE_CONTEXT = b"onlinetest-family-card-ed25519-v1"
-COMPACT_TOKEN_FORMAT = ">BI12s32s4s"
+LEGACY_COMPACT_TOKEN_FORMAT = ">BI12s32s4s"
+LEGACY_COMPACT_TOKEN_SIZE = struct.calcsize(LEGACY_COMPACT_TOKEN_FORMAT)
+COMPACT_TOKEN_FORMAT = ">BBI12s32s4s"
 COMPACT_TOKEN_SIZE = struct.calcsize(COMPACT_TOKEN_FORMAT)
+SIGNER_ROLE_CODES = {"family_head": 1, "village_head": 2}
+SIGNER_ROLES_BY_CODE = {value: key for key, value in SIGNER_ROLE_CODES.items()}
+SIGNER_LABELS = {
+    "family_head": "Kepala Keluarga",
+    "village_head": "Kepala Desa/Lurah",
+}
+SIGNING_KEY_ENVIRONMENTS = {
+    "family_head": "FAMILY_CARD_SIGNING_PRIVATE_KEY",
+    "village_head": "VILLAGE_HEAD_SIGNING_PRIVATE_KEY",
+}
 SIGNED_MEMBER_FIELDS = (
     "Nama",
     "NIK",
@@ -39,6 +51,14 @@ SIGNED_MEMBER_FIELDS = (
     "no_paspor",
     "no_kitap",
     "Alamat",
+    "rt",
+    "rw",
+    "desa_kelurahan",
+    "kecamatan",
+    "kabupaten_kota",
+    "kode_pos",
+    "provinsi",
+    "nama_kepala_desa",
 )
 
 
@@ -51,36 +71,43 @@ def _b64url_decode(value):
     return base64.urlsafe_b64decode((value + padding).encode("ascii"))
 
 
-def _signing_seed():
-    configured_key = os.getenv("FAMILY_CARD_SIGNING_PRIVATE_KEY", "").strip()
+def _signing_seed(signer_role):
+    if signer_role not in SIGNER_ROLE_CODES:
+        raise ValueError("Unknown family-card signer role.")
+    environment_name = SIGNING_KEY_ENVIRONMENTS[signer_role]
+    configured_key = os.getenv(environment_name, "").strip()
     if configured_key:
         try:
             seed = _b64url_decode(configured_key)
         except (ValueError, UnicodeEncodeError) as exc:
             raise ImproperlyConfigured(
-                "FAMILY_CARD_SIGNING_PRIVATE_KEY must be a base64url value."
+                f"{environment_name} must be a base64url value."
             ) from exc
         if len(seed) != 32:
             raise ImproperlyConfigured(
-                "FAMILY_CARD_SIGNING_PRIVATE_KEY must decode to exactly 32 bytes."
+                f"{environment_name} must decode to exactly 32 bytes."
             )
         return seed
 
+    if signer_role == "family_head":
+        seed_material = SIGNATURE_CONTEXT + b"\0"
+    else:
+        seed_material = SIGNATURE_CONTEXT + b"\0village-head\0"
     return hashlib.sha256(
-        SIGNATURE_CONTEXT + b"\0" + settings.SECRET_KEY.encode("utf-8")
+        seed_material + settings.SECRET_KEY.encode("utf-8")
     ).digest()
 
 
-def _private_key():
-    return Ed25519PrivateKey.from_private_bytes(_signing_seed())
+def _private_key(signer_role):
+    return Ed25519PrivateKey.from_private_bytes(_signing_seed(signer_role))
 
 
-def _public_key():
-    return _private_key().public_key()
+def _public_key(signer_role):
+    return _private_key(signer_role).public_key()
 
 
-def public_key_fingerprint():
-    public_bytes = _public_key().public_bytes(
+def public_key_fingerprint(signer_role="family_head"):
+    public_bytes = _public_key(signer_role).public_bytes(
         encoding=serialization.Encoding.Raw,
         format=serialization.PublicFormat.Raw,
     )
@@ -116,7 +143,9 @@ def family_digest(members):
     return hashlib.sha256(canonical).hexdigest()
 
 
-def sign_family_card(no_kk, members, issued_at=None):
+def sign_family_card(no_kk, members, signer_role="family_head", issued_at=None):
+    if signer_role not in SIGNER_ROLE_CODES:
+        raise ValueError("Unknown family-card signer role.")
     issued_at = issued_at or timezone.now()
     no_kk_last4 = str(no_kk)[-4:]
     if len(no_kk_last4) != 4 or not no_kk_last4.isdigit():
@@ -127,20 +156,23 @@ def sign_family_card(no_kk, members, issued_at=None):
         "family_ref": family_reference(no_kk),
         "issued_at": issued_at.replace(microsecond=0).isoformat(),
         "no_kk_last4": no_kk_last4,
-        "v": 2,
+        "signer_role": signer_role,
+        "v": 3,
     }
     payload_bytes = struct.pack(
         COMPACT_TOKEN_FORMAT,
         payload["v"],
+        SIGNER_ROLE_CODES[signer_role],
         int(issued_at.timestamp()),
         bytes.fromhex(payload["family_ref"]),
         bytes.fromhex(payload["digest"]),
         no_kk_last4.encode("ascii"),
     )
-    signature = _private_key().sign(payload_bytes)
+    signature = _private_key(signer_role).sign(payload_bytes)
     token = f"{_b64url_encode(payload_bytes)}.{_b64url_encode(signature)}"
     return {
-        "fingerprint": public_key_fingerprint(),
+        "fingerprint": public_key_fingerprint(signer_role),
+        "label": SIGNER_LABELS[signer_role],
         "payload": payload,
         "token": token,
     }
@@ -156,17 +188,34 @@ def verify_family_card_token(token):
     except ValueError as exc:
         raise ValueError("Invalid family-card signature token.") from exc
 
-    try:
-        _public_key().verify(signature, payload_bytes)
-    except InvalidSignature as exc:
-        raise ValueError("Invalid family-card signature.") from exc
-
     if len(payload_bytes) == COMPACT_TOKEN_SIZE:
         try:
-            version, issued_at, family_ref, digest, no_kk_last4 = struct.unpack(
+            version, role_code, issued_at, family_ref, digest, no_kk_last4 = struct.unpack(
                 COMPACT_TOKEN_FORMAT,
                 payload_bytes,
             )
+            signer_role = SIGNER_ROLES_BY_CODE[role_code]
+            payload = {
+                "alg": "Ed25519",
+                "digest": digest.hex(),
+                "family_ref": family_ref.hex(),
+                "issued_at": datetime.fromtimestamp(
+                    issued_at,
+                    tz=datetime_timezone.utc,
+                ).isoformat(),
+                "no_kk_last4": no_kk_last4.decode("ascii"),
+                "signer_role": signer_role,
+                "v": version,
+            }
+        except (KeyError, ValueError, UnicodeDecodeError, struct.error) as exc:
+            raise ValueError("Invalid family-card signature payload.") from exc
+    elif len(payload_bytes) == LEGACY_COMPACT_TOKEN_SIZE:
+        try:
+            version, issued_at, family_ref, digest, no_kk_last4 = struct.unpack(
+                LEGACY_COMPACT_TOKEN_FORMAT,
+                payload_bytes,
+            )
+            signer_role = "family_head"
             payload = {
                 "alg": "Ed25519",
                 "digest": digest.hex(),
@@ -185,18 +234,30 @@ def verify_family_card_token(token):
             payload = json.loads(payload_bytes.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ValueError("Invalid family-card signature payload.") from exc
+        signer_role = "family_head"
+
+    try:
+        _public_key(signer_role).verify(signature, payload_bytes)
+    except InvalidSignature as exc:
+        raise ValueError("Invalid family-card signature.") from exc
 
     required = {"alg", "digest", "family_ref", "issued_at", "no_kk_last4", "v"}
+    if payload.get("v") == 3:
+        required.add("signer_role")
     if (
         set(payload) != required
         or payload.get("alg") != "Ed25519"
-        or payload.get("v") not in (1, 2)
+        or payload.get("v") not in (1, 2, 3)
         or len(payload.get("digest", "")) != 64
         or len(payload.get("family_ref", "")) != 24
         or len(payload.get("no_kk_last4", "")) != 4
         or not payload.get("no_kk_last4", "").isdigit()
+        or signer_role not in SIGNER_ROLE_CODES
+        or payload.get("signer_role", signer_role) != signer_role
     ):
         raise ValueError("Invalid family-card signature payload.")
+    payload.setdefault("signer_role", signer_role)
+    payload["signer_label"] = SIGNER_LABELS[signer_role]
     return payload
 
 
