@@ -68,6 +68,52 @@ class HQCBenchmarkHelpersTestCase(TestCase):
                 payload = _wrap_hqc(dek, wrapping, repetition)
                 self.assertEqual(_unwrap_hqc(payload), dek)
 
+    def test_factorial_effects_are_calculated_within_blocks(self):
+        from main.benchmark import CONFIGURATIONS, _paired_factor_tests
+
+        values = {
+            "T1_single_no_repetition": [0.0, 0.0, 0.0],
+            "T2_single_repetition_3": [2.0, 2.0, 2.0],
+            "T3_double_no_repetition": [4.0, 4.0, 4.0],
+            "T4_double_repetition_3": [8.0, 8.0, 8.0],
+        }
+        results = [
+            {
+                "configuration": name,
+                "metric": {"observations_ms": values[name]},
+            }
+            for name, _, _ in CONFIGURATIONS
+        ]
+
+        effects = _paired_factor_tests(results, "metric")
+
+        self.assertEqual(effects["repetition_main_effect"]["mean_effect_ms"], 3.0)
+        self.assertEqual(effects["double_wrap_main_effect"]["mean_effect_ms"], 5.0)
+        self.assertEqual(effects["interaction"]["mean_effect_ms"], 2.0)
+        self.assertEqual(effects["interaction"]["n_independent_blocks"], 3)
+
+    def test_holm_adjustment_controls_familywise_order(self):
+        from main.benchmark import _holm_adjust
+
+        adjusted = _holm_adjust({"a": 0.01, "b": 0.04, "c": 0.03})
+
+        self.assertAlmostEqual(adjusted["a"], 0.03)
+        self.assertAlmostEqual(adjusted["c"], 0.06)
+        self.assertAlmostEqual(adjusted["b"], 0.06)
+
+    def test_dummy_image_is_512_rgb_png(self):
+        from io import BytesIO
+
+        from PIL import Image
+
+        from main.benchmark import build_dummy_image
+
+        image = Image.open(BytesIO(build_dummy_image(4)))
+
+        self.assertEqual(image.format, "PNG")
+        self.assertEqual(image.mode, "RGB")
+        self.assertEqual(image.size, (512, 512))
+
 
 class McElieceReedMullerTestCase(TestCase):
     def test_bit_round_trip(self):

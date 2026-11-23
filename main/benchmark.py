@@ -1,9 +1,11 @@
+import io
 import json
 import os
 import statistics
 import time
 
 import numpy as np
+from PIL import Image
 from django.conf import settings
 
 from main.crypto.aes_hqc import (
@@ -50,7 +52,11 @@ def summarize(values):
 
 def build_dummy_image(seed):
     rng = np.random.default_rng(seed)
-    return rng.integers(0, 256, size=4096, dtype=np.uint8).tobytes()
+    pixels = rng.integers(0, 256, size=(512, 512, 3), dtype=np.uint8)
+    image = Image.fromarray(pixels, mode="RGB")
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
 
 
 def _wrap_hqc(aes_key, wrapping, repetition):
@@ -103,34 +109,56 @@ def _two_sided_sign_flip(values, seed=20261123, permutations=20000):
     return (exceed + 1) / (permutations + 1)
 
 
+def _bootstrap_ci(values, seed, resamples=20000):
+    rng = np.random.default_rng(seed)
+    values = np.asarray(values, dtype=float)
+    means = np.empty(resamples, dtype=float)
+    for start in range(0, resamples, 1000):
+        count = min(1000, resamples - start)
+        sampled = rng.choice(values, size=(count, len(values)), replace=True)
+        means[start:start + count] = sampled.mean(axis=1)
+    low, high = np.percentile(means, [2.5, 97.5])
+    return [float(low), float(high)]
+
+
 def _paired_factor_tests(results, metric):
     rows = {row["configuration"]: row[metric]["observations_ms"] for row in results}
     pairs = min(len(values) for values in rows.values())
     t1, t2, t3, t4 = (rows[name][:pairs] for name, _, _ in CONFIGURATIONS)
     contrasts = {
-        "repetition_main_effect": [(b - a) for a, b in zip(t1, t2)]
-        + [(b - a) for a, b in zip(t3, t4)],
-        "double_wrap_main_effect": [(b - a) for a, b in zip(t1, t3)]
-        + [(b - a) for a, b in zip(t2, t4)],
+        "repetition_main_effect": [((b - a) + (d - c)) / 2 for a, b, c, d in zip(t1, t2, t3, t4)],
+        "double_wrap_main_effect": [((c - a) + (d - b)) / 2 for a, b, c, d in zip(t1, t2, t3, t4)],
         "interaction": [(d - c) - (b - a) for a, b, c, d in zip(t1, t2, t3, t4)],
     }
     return {
         name: {
-            "mean_paired_difference_ms": float(np.mean(values)),
+            "mean_effect_ms": float(np.mean(values)),
+            "ci95_bootstrap_ms": _bootstrap_ci(values, seed=20261201 + index),
             "p_value_sign_flip": _two_sided_sign_flip(values, seed=20261123 + index),
-            "n_paired_contrasts": len(values),
+            "n_independent_blocks": len(values),
         }
         for index, (name, values) in enumerate(contrasts.items())
     }
 
 
-def run_configuration(name, wrapping, repetition, sample_size, owner):
+def _holm_adjust(p_values):
+    ordered = sorted(p_values.items(), key=lambda item: item[1])
+    adjusted = {}
+    running_max = 0.0
+    count = len(ordered)
+    for rank, (name, p_value) in enumerate(ordered):
+        running_max = max(running_max, min(1.0, (count - rank) * p_value))
+        adjusted[name] = running_max
+    return adjusted
+
+
+def run_configuration(name, wrapping, repetition, sample_size, owner, sample_offset=0):
     insert_crypto_ms, insert_db_ms, insert_total_ms = [], [], []
     select_db_ms, decrypt_ms, select_total_ms, storage_bytes = [], [], [], []
     created_ids = []
 
     try:
-        for index in range(sample_size):
+        for index in range(sample_offset, sample_offset + sample_size):
             nama = f"BENCHMARK:Nama {index:04d}"
             nik = f"3507{index:012d}"
             alamat = f"Jalan Benchmark Nomor {index}, Kota Uji"
@@ -206,11 +234,44 @@ def run_configuration(name, wrapping, repetition, sample_size, owner):
 
 def run_wrapping_benchmark(sample_size, owner):
     started_at = time.perf_counter()
-    results = [
-        run_configuration(name, wrapping, repetition, sample_size, owner)
-        for name, wrapping, repetition in CONFIGURATIONS
-    ]
+    rng = np.random.default_rng(20261123)
+    results_by_configuration = {name: [] for name, _, _ in CONFIGURATIONS}
+    for block in range(sample_size):
+        order = rng.permutation(len(CONFIGURATIONS))
+        for config_index in order:
+            name, wrapping, repetition = CONFIGURATIONS[int(config_index)]
+            result = run_configuration(
+                name, wrapping, repetition, 1, owner, sample_offset=block
+            )
+            results_by_configuration[name].append(result)
+
     metrics = ("insert_crypto", "insert_db", "insert_total", "select_db", "decrypt", "select_total")
+    results = []
+    for name, wrapping, repetition in CONFIGURATIONS:
+        blocks = results_by_configuration[name]
+        row = {
+            "configuration": name,
+            "wrapping": wrapping,
+            "repetition": repetition,
+            "sample_size": sample_size,
+        }
+        for metric in metrics:
+            observations = [item for block in blocks for item in block[metric]["observations_ms"]]
+            row[metric] = summarize(observations)
+        stored_sizes = [block["storage_mean_bytes"] for block in blocks]
+        row["storage_mean_bytes"] = statistics.mean(stored_sizes)
+        row["storage_p95_bytes"] = percentile(stored_sizes, 95)
+        results.append(row)
+    tests = {metric: _paired_factor_tests(results, metric) for metric in metrics}
+    all_p_values = {
+        f"{metric}.{effect}": result["p_value_sign_flip"]
+        for metric, effects in tests.items()
+        for effect, result in effects.items()
+    }
+    adjusted = _holm_adjust(all_p_values)
+    for metric, effects in tests.items():
+        for effect, result in effects.items():
+            result["p_value_holm_18_tests"] = adjusted[f"{metric}.{effect}"]
     return {
         "environment": {
             "database_engine": settings.DATABASES["default"]["ENGINE"],
@@ -218,12 +279,12 @@ def run_wrapping_benchmark(sample_size, owner):
             "implementation": getattr(settings, "HQC_IMPLEMENTATION_VERSION", None)
             or os.environ.get("HQC_IMPLEMENTATION_VERSION"),
             "sample_size_per_configuration": sample_size,
-            "design": "2x2 repeated paired observations; 1 or 3 HQC envelopes per recipient",
+            "design": f"2x2 factorial; {sample_size} randomized complete blocks; 1 or 3 HQC envelopes per recipient",
+            "image_workload": "synthetic 512x512 RGB PNG; not a natural-image benchmark dataset",
             "total_runtime_ms": (time.perf_counter() - started_at) * 1000,
-            "warning": "Single Railway instance run; report separately from controlled local experiments.",
+            "statistical_method": "paired block sign-flip tests; percentile bootstrap 95% CIs; Holm correction across 18 tests",
+            "warning": "One Railway deployment/session; report as supplementary deployment evidence, not as a substitute for controlled repeated sessions.",
         },
         "results": results,
-        "paired_sign_flip_tests": {
-            metric: _paired_factor_tests(results, metric) for metric in metrics
-        },
+        "factorial_tests": tests,
     }
