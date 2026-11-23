@@ -13,7 +13,7 @@
       "commands": [
         "...",
         {
-          "cmd": "OQS_INSTALL_PATH=/app/.oqs PYOQS_VERSION=0.16.0 python -c \"import oqs; assert 'HQC-1' in oqs.get_enabled_kem_mechanisms(), 'HQC-1 is not enabled in the native liboqs build'\"",
+          "cmd": "python -c \"import os; os.environ['OQS_INSTALL_PATH']='/app/.oqs'; os.environ['PYOQS_VERSION']='0.16.0'; import oqs; assert 'HQC-1' in oqs.get_enabled_kem_mechanisms(), 'HQC-1 is not enabled in the native liboqs build'\"",
           "customName": "Build and verify native liboqs HQC"
         }
       ]
