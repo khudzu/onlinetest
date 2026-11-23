@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import LiveServerTestCase, TestCase, tag
 from django.urls import reverse
 from selenium import webdriver
@@ -47,9 +49,24 @@ class MainTestCase(TestCase):
     def test_root_url_status_200(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        # You can also use path names instead of explicit paths.
         response = self.client.get(reverse('main:home'))
         self.assertEqual(response.status_code, 200)
+
+
+class HQCBenchmarkHelpersTestCase(TestCase):
+    @patch("main.benchmark.unwrap_hqc_key")
+    @patch("main.benchmark.wrap_hqc_key")
+    def test_single_and_double_repeated_envelopes_round_trip(self, wrap, unwrap):
+        from main.benchmark import _unwrap_hqc, _wrap_hqc
+
+        dek = b"test-dek"
+        wrap.side_effect = lambda key, label: {"dek": key.decode(), "label": label}
+        unwrap.side_effect = lambda artifact, label: artifact["dek"].encode()
+
+        for wrapping, repetition in (("single", 1), ("single", 3), ("double", 1), ("double", 3)):
+            with self.subTest(wrapping=wrapping, repetition=repetition):
+                payload = _wrap_hqc(dek, wrapping, repetition)
+                self.assertEqual(_unwrap_hqc(payload), dek)
 
 
 class McElieceReedMullerTestCase(TestCase):

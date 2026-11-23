@@ -1,19 +1,23 @@
 import json
+import os
 import statistics
 import time
 
 import numpy as np
 from django.conf import settings
 
+from main.crypto.aes_hqc import (
+    SCHEME,
+    _algorithm as hqc_algorithm,
+    unwrap_aes_key as unwrap_hqc_key,
+    wrap_aes_key as wrap_hqc_key,
+)
 from main.crypto.aes_reed_muller import (
     decrypt_image_bytes,
     decrypt_text,
     encrypt_image_bytes,
     encrypt_text,
     generate_aes_key,
-    unwrap_aes_key,
-    wrap_aes_key,
-    wrap_aes_key_double,
 )
 from main.models import PostModel
 
@@ -29,18 +33,18 @@ CONFIGURATIONS = [
 def percentile(values, p):
     if not values:
         return 0.0
-    ordered = sorted(values)
-    index = int(round((len(ordered) - 1) * (p / 100)))
-    return ordered[index]
+    return float(np.percentile(values, p, method="linear"))
 
 
 def summarize(values):
     return {
         "mean_ms": statistics.mean(values),
+        "stddev_ms": statistics.stdev(values) if len(values) > 1 else 0.0,
         "median_ms": statistics.median(values),
         "p95_ms": percentile(values, 95),
         "min_ms": min(values),
         "max_ms": max(values),
+        "observations_ms": values,
     }
 
 
@@ -49,47 +53,80 @@ def build_dummy_image(seed):
     return rng.integers(0, 256, size=4096, dtype=np.uint8).tobytes()
 
 
-def wrap_key(aes_key, wrapping, repetition):
-    if wrapping == "single" and repetition == 1:
-        return wrap_aes_key(aes_key)
-    if wrapping == "single":
-        data = {
-            "scheme": "single-wrap-repetition",
-            "alg": "McEliece-RM(1,4)",
+def _wrap_hqc(aes_key, wrapping, repetition):
+    labels = ("A",) if wrapping == "single" else ("A", "B")
+    artifacts = {
+        f"wrapped_DEK_{label}_{index}": wrap_hqc_key(aes_key, label)
+        for label in labels
+        for index in range(1, repetition + 1)
+    }
+    return json.dumps(
+        {
+            "scheme": f"{SCHEME}-{wrapping}-wrap-repetition",
+            "kem": hqc_algorithm(),
             "repetition": repetition,
-        }
-        for index in range(1, repetition + 1):
-            data[f"wrapped_DEK_A_{index}"] = json.loads(wrap_aes_key(aes_key))
-        return json.dumps(data, separators=(",", ":"))
-    if wrapping == "double":
-        return wrap_aes_key_double(aes_key, repetitions=repetition)
-    raise ValueError(f"Unknown wrapping mode: {wrapping}")
+            "wrapping": wrapping,
+            **artifacts,
+        },
+        separators=(",", ":"),
+    )
 
 
-def unwrap_key(payload):
+def _unwrap_hqc(payload):
     data = json.loads(payload)
-    if data.get("scheme") == "single-wrap-repetition":
-        errors = []
-        for index in range(1, data.get("repetition", 3) + 1):
-            wrapped = data.get(f"wrapped_DEK_A_{index}")
-            if not wrapped:
-                continue
-            try:
-                return unwrap_aes_key(json.dumps(wrapped, separators=(",", ":")))
-            except Exception as exc:
-                errors.append(str(exc))
-        raise ValueError(f"Could not unwrap repeated single-wrap DEK: {errors}")
-    return unwrap_aes_key(payload)
+    recovered = []
+    for label in (("A",) if data["wrapping"] == "single" else ("A", "B")):
+        for index in range(1, data["repetition"] + 1):
+            artifact = data.get(f"wrapped_DEK_{label}_{index}")
+            if artifact:
+                recovered.append(unwrap_hqc_key(artifact, label=label))
+    if not recovered or any(key != recovered[0] for key in recovered[1:]):
+        raise ValueError("Repeated HQC envelopes did not recover one consistent DEK.")
+    return recovered[0]
+
+
+def _two_sided_sign_flip(values, seed=20261123, permutations=20000):
+    """Monte Carlo paired sign-flip test for a mean contrast."""
+    if not values:
+        return 1.0
+    observed = abs(float(np.mean(values)))
+    rng = np.random.default_rng(seed)
+    samples = np.asarray(values, dtype=float)
+    exceed = 0
+    batch_size = 1000
+    completed = 0
+    while completed < permutations:
+        count = min(batch_size, permutations - completed)
+        signs = rng.choice(np.array([-1.0, 1.0]), size=(count, len(samples)))
+        exceed += int(np.count_nonzero(np.abs((signs * samples).mean(axis=1)) >= observed))
+        completed += count
+    return (exceed + 1) / (permutations + 1)
+
+
+def _paired_factor_tests(results, metric):
+    rows = {row["configuration"]: row[metric]["observations_ms"] for row in results}
+    pairs = min(len(values) for values in rows.values())
+    t1, t2, t3, t4 = (rows[name][:pairs] for name, _, _ in CONFIGURATIONS)
+    contrasts = {
+        "repetition_main_effect": [(b - a) for a, b in zip(t1, t2)]
+        + [(b - a) for a, b in zip(t3, t4)],
+        "double_wrap_main_effect": [(b - a) for a, b in zip(t1, t3)]
+        + [(b - a) for a, b in zip(t2, t4)],
+        "interaction": [(d - c) - (b - a) for a, b, c, d in zip(t1, t2, t3, t4)],
+    }
+    return {
+        name: {
+            "mean_paired_difference_ms": float(np.mean(values)),
+            "p_value_sign_flip": _two_sided_sign_flip(values, seed=20261123 + index),
+            "n_paired_contrasts": len(values),
+        }
+        for index, (name, values) in enumerate(contrasts.items())
+    }
 
 
 def run_configuration(name, wrapping, repetition, sample_size, owner):
-    insert_crypto_ms = []
-    insert_db_ms = []
-    insert_total_ms = []
-    select_db_ms = []
-    decrypt_ms = []
-    select_total_ms = []
-    storage_bytes = []
+    insert_crypto_ms, insert_db_ms, insert_total_ms = [], [], []
+    select_db_ms, decrypt_ms, select_total_ms, storage_bytes = [], [], [], []
     created_ids = []
 
     try:
@@ -108,7 +145,7 @@ def run_configuration(name, wrapping, repetition, sample_size, owner):
             encrypted_alamat = encrypt_text(alamat, aes_key)
             encrypted_password = encrypt_text(password, aes_key)
             encrypted_image = encrypt_image_bytes(image_bytes, aes_key).decode("utf-8")
-            wrapped_key = wrap_key(aes_key, wrapping, repetition)
+            wrapped_key = _wrap_hqc(aes_key, wrapping, repetition)
             insert_crypto_ms.append((time.perf_counter() - crypto_start) * 1000)
 
             db_start = time.perf_counter()
@@ -126,17 +163,10 @@ def run_configuration(name, wrapping, repetition, sample_size, owner):
             insert_total_ms.append((time.perf_counter() - total_start) * 1000)
             created_ids.append(record.id)
             storage_bytes.append(
-                sum(
-                    len(value.encode("utf-8"))
-                    for value in [
-                        encrypted_name,
-                        encrypted_nik,
-                        encrypted_alamat,
-                        encrypted_password,
-                        encrypted_image,
-                        wrapped_key,
-                    ]
-                )
+                sum(len(value.encode("utf-8")) for value in (
+                    encrypted_name, encrypted_nik, encrypted_alamat,
+                    encrypted_password, encrypted_image, wrapped_key,
+                ))
             )
 
         for record_id in created_ids:
@@ -146,7 +176,7 @@ def run_configuration(name, wrapping, repetition, sample_size, owner):
             select_db_ms.append((time.perf_counter() - db_start) * 1000)
 
             decrypt_start = time.perf_counter()
-            aes_key = unwrap_key(record.aes_key)
+            aes_key = _unwrap_hqc(record.aes_key)
             decrypt_text(record.Nama, aes_key)
             decrypt_text(record.NIK, aes_key)
             decrypt_text(record.Alamat, aes_key)
@@ -180,11 +210,20 @@ def run_wrapping_benchmark(sample_size, owner):
         run_configuration(name, wrapping, repetition, sample_size, owner)
         for name, wrapping, repetition in CONFIGURATIONS
     ]
+    metrics = ("insert_crypto", "insert_db", "insert_total", "select_db", "decrypt", "select_total")
     return {
         "environment": {
             "database_engine": settings.DATABASES["default"]["ENGINE"],
+            "kem": hqc_algorithm(),
+            "implementation": getattr(settings, "HQC_IMPLEMENTATION_VERSION", None)
+            or os.environ.get("HQC_IMPLEMENTATION_VERSION"),
             "sample_size_per_configuration": sample_size,
+            "design": "2x2 repeated paired observations; 1 or 3 HQC envelopes per recipient",
             "total_runtime_ms": (time.perf_counter() - started_at) * 1000,
+            "warning": "Single Railway instance run; report separately from controlled local experiments.",
         },
         "results": results,
+        "paired_sign_flip_tests": {
+            metric: _paired_factor_tests(results, metric) for metric in metrics
+        },
     }
