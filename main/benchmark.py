@@ -51,12 +51,26 @@ def summarize(values):
 
 
 def build_dummy_image(seed):
+    """Build a reproducible, photo-like 512x512 JPEG with bounded storage size."""
     rng = np.random.default_rng(seed)
-    pixels = rng.integers(0, 256, size=(512, 512, 3), dtype=np.uint8)
-    image = Image.fromarray(pixels, mode="RGB")
+    axis = np.linspace(0, 255, 512, dtype=np.float32)
+    x, y = np.meshgrid(axis, axis)
+    noise = rng.normal(0, 10, size=(512, 512))
+    pixels = np.stack(
+        (
+            np.clip(0.55 * x + 0.35 * y + noise, 0, 255),
+            np.clip(0.25 * x + 0.65 * y + noise, 0, 255),
+            np.clip(0.65 * x + 0.20 * y + noise, 0, 255),
+        ),
+        axis=-1,
+    ).astype(np.uint8)
+    image = Image.fromarray(pixels)
     output = io.BytesIO()
-    image.save(output, format="PNG")
-    return output.getvalue()
+    image.save(output, format="JPEG", quality=82, optimize=True)
+    image_bytes = output.getvalue()
+    if len(image_bytes) > 100_000:
+        raise ValueError("Synthetic benchmark image exceeded the 100 kB storage limit.")
+    return image_bytes
 
 
 def _wrap_hqc(aes_key, wrapping, repetition):
@@ -280,7 +294,7 @@ def run_wrapping_benchmark(sample_size, owner):
             or os.environ.get("HQC_IMPLEMENTATION_VERSION"),
             "sample_size_per_configuration": sample_size,
             "design": f"2x2 factorial; {sample_size} randomized complete blocks; 1 or 3 HQC envelopes per recipient",
-            "image_workload": "synthetic 512x512 RGB PNG; not a natural-image benchmark dataset",
+            "image_workload": "synthetic 512x512 RGB JPEG (quality 82; <=100 kB); not a natural-image benchmark dataset",
             "total_runtime_ms": (time.perf_counter() - started_at) * 1000,
             "statistical_method": "paired block sign-flip tests; percentile bootstrap 95% CIs; Holm correction across 18 tests",
             "warning": "One Railway deployment/session; report as supplementary deployment evidence, not as a substitute for controlled repeated sessions.",

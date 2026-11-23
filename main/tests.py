@@ -101,18 +101,21 @@ class HQCBenchmarkHelpersTestCase(TestCase):
         self.assertAlmostEqual(adjusted["c"], 0.06)
         self.assertAlmostEqual(adjusted["b"], 0.06)
 
-    def test_dummy_image_is_512_rgb_png(self):
+    def test_dummy_image_is_bounded_512_rgb_jpeg(self):
         from io import BytesIO
 
         from PIL import Image
 
         from main.benchmark import build_dummy_image
 
-        image = Image.open(BytesIO(build_dummy_image(4)))
+        payload = build_dummy_image(4)
+        image = Image.open(BytesIO(payload))
 
-        self.assertEqual(image.format, "PNG")
+        self.assertEqual(image.format, "JPEG")
         self.assertEqual(image.mode, "RGB")
         self.assertEqual(image.size, (512, 512))
+        self.assertLessEqual(len(payload), 100_000)
+        self.assertEqual(payload, build_dummy_image(4))
 
 
 class McElieceReedMullerTestCase(TestCase):
