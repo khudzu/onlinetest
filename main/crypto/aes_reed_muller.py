@@ -151,6 +151,12 @@ def wrap_aes_key(aes_key, password=None, salt=None):
 
 def unwrap_aes_key(payload, password=None, salt=None):
     data = json.loads(payload)
+    if str(data.get("scheme", "")).startswith("HQC-KEM-AES-256-GCM"):
+        from main.crypto.aes_hqc import unwrap_aes_key, unwrap_aes_key_double
+
+        if data.get("scheme", "").endswith("double-wrap-repetition"):
+            return unwrap_aes_key_double(data)
+        return unwrap_aes_key(data)
     if data.get("scheme") == "double-wrap-repetition":
         try:
             return unwrap_aes_key_double(payload, password, salt)
@@ -175,6 +181,10 @@ def wrap_aes_key_double(aes_key, password=None, salt=None, repetitions=3):
 
 def unwrap_aes_key_double(payload, password=None, salt=None):
     data = json.loads(payload)
+    if str(data.get("scheme", "")).startswith("HQC-KEM-AES-256-GCM"):
+        from main.crypto.aes_hqc import unwrap_aes_key_double
+
+        return unwrap_aes_key_double(data)
     candidates = []
 
     for label in ["A", "B"]:
