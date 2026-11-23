@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "python",
+  "buildAptPackages": [
+    "...",
+    "build-essential",
+    "cmake",
+    "git",
+    "libssl-dev"
+  ],
+  "steps": {
+    "build": {
+      "commands": [
+        "...",
+        {
+          "cmd": "OQS_INSTALL_PATH=/app/.oqs PYOQS_VERSION=0.16.0 python -c \"import oqs; assert 'HQC-1' in oqs.get_enabled_kem_mechanisms(), 'HQC-1 is not enabled in the native liboqs build'\"",
+          "customName": "Build and verify native liboqs HQC"
+        }
+      ]
+    }
+  },
+  "deploy": {
+    "variables": {
+      "OQS_INSTALL_PATH": "/app/.oqs",
+      "PYOQS_VERSION": "0.16.0"
+    },
+    "inputs": [
+      "...",
+      {
+        "step": "build",
+        "include": ["/app/.oqs"]
+      }
+    ]
+  }
+}
